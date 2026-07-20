@@ -42,8 +42,10 @@ function pageToSite(page) {
     name: getTitle("공사명") || "이름없음",
     company: getRichText("회사") || getFormulaString("F회사명"),
     visits: getNumber("지도횟수") || 0,
+    targetVisits: getNumber("지도횟수") || 0,
     lastVisit: getDate("방문일자"),
-    contact: getPhone("감독자 연락처") || getRichText("감독자"),
+    contact: getPhone("감독자 연락처") || getRichText("감독자 연락처") || "",
+    managerName: getRichText("감독자") || "",
     address: getRichText("현장주소"),
     start: getDate("착공일"),
     end: getDate("준공일"),
@@ -54,6 +56,9 @@ function pageToSite(page) {
     note: getRichText("비고"),
     site: getSelect("사이트"),
     manager: getRichText("감독자"),
+    bizOpenNo: getRichText("사업장개시번호"),
+    bizMgmtNo: getRichText("사업장관리번호"),
+    mgmtNo: getRichText("관리번호"),
     lastEdited: page.last_edited_time,
   };
 }
@@ -102,6 +107,8 @@ app.get("/api/contracts", async (req, res) => {
       ...g,
       visits: g.visitDates.length,
       lastVisit: g.visitDates.sort().reverse()[0] || null,
+      contactDates: g.contactDates.sort().reverse(),
+      visitDates: g.visitDates.sort().reverse(),
     }));
 
     sites.sort((a, b) => new Date(b.lastEdited) - new Date(a.lastEdited));
