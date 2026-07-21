@@ -121,19 +121,27 @@ app.get("/api/contracts", async (req, res) => {
 });
 
 // ---- PATCH update visit date / contact date on a page ----
+// date는 날짜 문자열(저장) 또는 null(삭제)을 허용한다.
+// undefined일 때만("date" 키 자체가 안 온 경우) 오류로 처리한다.
 app.post("/api/update-visit", async (req, res) => {
   try {
     const { pageId, propertyName, date } = req.body;
-    if (!pageId || !propertyName || !date) {
-      return res.status(400).json({ ok: false, error: "pageId, propertyName, date required" });
+
+    if (!pageId || !propertyName || date === undefined) {
+      return res.status(400).json({
+        ok: false,
+        error: "pageId, propertyName required, date must be a date string or null",
+      });
     }
+
     await notion.pages.update({
       page_id: pageId,
       properties: {
-        [propertyName]: { date: { start: date } },
+        [propertyName]: { date: date ? { start: date } : null },
       },
     });
-    res.json({ ok: true });
+
+    res.json({ ok: true, cleared: date === null });
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: err.message });
@@ -170,14 +178,13 @@ app.post("/api/ai-schedule", async (req, res) => {
   }
 });
 
-
 // ---- DEBUG: 실제 Notion 속성 이름 확인용 ----
 app.get("/api/debug-schema", async (req, res) => {
   try {
     const resp = await notion.databases.retrieve({ database_id: DB_ID });
-    const propNames = Object.keys(resp.properties).map(k => ({
+    const propNames = Object.keys(resp.properties).map((k) => ({
       name: k,
-      type: resp.properties[k].type
+      type: resp.properties[k].type,
     }));
     res.json({ ok: true, properties: propNames });
   } catch (err) {
