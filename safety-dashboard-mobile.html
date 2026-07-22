@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>안전관리 대시보드</title>
+<style>
+:root{
+  --bg:#f7f6f2; --surface:#ffffff; --surface2:#f3f0ec; --border:#dcd9d5;
+  --text:#28251d; --muted:#7a7974; --primary:#01696f; --primary-h:#0c4e54;
+  --warn:#964219; --err:#a12c7b; --ok:#437a22; --radius:12px;
+}
+[data-theme="dark"]{
+  --bg:#171614; --surface:#1c1b19; --surface2:#201f1d; --border:#393836;
+  --text:#cdccca; --muted:#9a9995; --primary:#4f98a3; --primary-h:#227f8b;
+  --warn:#bb653b; --err:#d163a7; --ok:#6daa45;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);
+  -webkit-font-smoothing:antialiased; padding-bottom:80px;}
+header{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);
+  padding:12px 16px;display:flex;align-items:center;justify-content:space-between;}
+header h1{font-size:18px;font-weight:700;}
+.icon-btn{width:40px;height:40px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;border:none;color:var(--text);}
+main{padding:12px;max-width:640px;margin:0 auto;}
+.kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;}
+.kpi .label{font-size:12px;color:var(--muted);margin-bottom:4px;}
+.kpi .value{font-size:22px;font-weight:800;}
+.section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden;}
+.section-header{padding:12px 14px;font-weight:700;font-size:14px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;}
+.tabs{display:flex;gap:6px;padding:8px 12px;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--border);
+  position:sticky;top:57px;z-index:15;}
+.tab{flex:0 0 auto;padding:8px 14px;border-radius:999px;font-size:13px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);white-space:nowrap;}
+.tab.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+.site-card{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:4px;}
+.site-card:last-child{border-bottom:none;}
+.site-top{display:flex;justify-content:space-between;align-items:center;}
+.site-name{font-weight:700;font-size:14px;}
+.badge{font-size:11px;padding:3px 8px;border-radius:999px;background:var(--surface2);color:var(--muted);}
+.badge.warn{background:color-mix(in oklab, var(--warn) 18%, var(--surface));color:var(--warn);}
+.badge.ok{background:color-mix(in oklab, var(--ok) 18%, var(--surface));color:var(--ok);}
+.site-meta{font-size:12px;color:var(--muted);}
+.site-actions{display:flex;gap:6px;margin-top:6px;}
+.btn{flex:1;padding:8px 0;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;font-weight:600;}
+.btn.primary{background:var(--primary);color:#fff;border-color:var(--primary);}
+.empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
+.fab{position:fixed;bottom:20px;right:20px;width:56px;height:56px;border-radius:50%;background:var(--primary);color:#fff;
+  border:none;font-size:22px;box-shadow:0 6px 16px rgba(0,0,0,.2);z-index:30;}
+.sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:40;display:none;}
+.sheet-overlay.open{display:block;}
+.sheet{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-radius:16px 16px 0 0;padding:16px;
+  transform:translateY(100%);transition:transform .25s cubic-bezier(.16,1,.3,1);z-index:41;max-height:80vh;overflow-y:auto;}
+.sheet.open{transform:translateY(0);}
+.sheet h3{font-size:16px;margin-bottom:12px;}
+.sheet textarea{width:100%;min-height:70px;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:14px;background:var(--surface2);color:var(--text);}
+.sheet .row{display:flex;gap:8px;margin-top:10px;}
+.sheet .row .btn{flex:1;padding:10px 0;}
+.loading{display:flex;justify-content:center;padding:24px;color:var(--muted);font-size:13px;}
+::selection{background:color-mix(in oklab, var(--primary) 25%, transparent);}
+@media (min-width:700px){
+  main{max-width:720px;}
+  .kpi-grid{grid-template-columns:repeat(4,1fr);}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>안전관리 대시보드</h1>
+  <button class="icon-btn" id="themeToggle" aria-label="테마 전환">🌙</button>
+</header>
+
+<div class="tabs" id="tabs">
+  <button class="tab active" data-tab="overview">개요</button>
+  <button class="tab" data-tab="sites">사이트 현황</button>
+  <button class="tab" data-tab="contact">연락요청</button>
+  <button class="tab" data-tab="visit">방문관리</button>
+</div>
+
+<main>
+  <div class="kpi-grid" id="kpiGrid">
+    <div class="kpi"><div class="label">전체 현장</div><div class="value" id="kpiTotal">-</div></div>
+    <div class="kpi"><div class="label">이번달 미방문</div><div class="value" id="kpiNoVisitMonth">-</div></div>
+    <div class="kpi"><div class="label">1회도 방문없음</div><div class="value" id="kpiNeverVisited">-</div></div>
+    <div class="kpi"><div class="label">이번달 총 방문</div><div class="value" id="kpiVisitsMonth">-</div></div>
+  </div>
+
+  <div class="section" id="panel-overview">
+    <div class="section-header">최근 활동</div>
+    <div id="recentList"><div class="loading">불러오는 중...</div></div>
+  </div>
+
+  <div class="section" id="panel-sites" style="display:none;">
+    <div class="section-header">사이트 현황</div>
+    <div id="siteList"><div class="loading">불러오는 중...</div></div>
+  </div>
+
+  <div class="section" id="panel-contact" style="display:none;">
+    <div class="section-header">연락요청</div>
+    <div id="contactList"><div class="loading">불러오는 중...</div></div>
+  </div>
+
+  <div class="section" id="panel-visit" style="display:none;">
+    <div class="section-header">준공 임박 / 방문관리</div>
+    <div id="visitList"><div class="loading">불러오는 중...</div></div>
+  </div>
+</main>
+
+<button class="fab" id="aiFab" aria-label="AI 명령">✨</button>
+
+<div class="sheet-overlay" id="sheetOverlay"></div>
+<div class="sheet" id="aiSheet">
+  <h3>AI에게 지시하기</h3>
+  <textarea id="aiInput" placeholder="예: OO현장 오늘 방문 처리해줘"></textarea>
+  <div class="row">
+    <button class="btn" id="aiCancel">취소</button>
+    <button class="btn primary" id="aiSend">보내기</button>
+  </div>
+  <div id="aiResult" style="margin-top:12px;font-size:13px;color:var(--muted);"></div>
+</div>
+
+<script>
+const API_BASE = "http://localhost:3000"; // Render 배포 URL로 교체하세요
+let sites = [];
+
+function fmtDate(d){ return d ? d : '-'; }
+function isThisMonth(dateStr){
+  if(!dateStr) return false;
+  const d = new Date(dateStr), now = new Date();
+  return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+}
+
+async function loadContracts(){
+  try{
+    const res = await fetch(`${API_BASE}/api/contracts`);
+    const data = await res.json();
+    sites = data.sites || [];
+    renderAll();
+  }catch(e){
+    document.getElementById('recentList').innerHTML = `<div class="empty">데이터를 불러오지 못했습니다.<br>서버 주소를 확인하세요.</div>`;
+  }
+}
+
+function renderKpis(){
+  const total = sites.length;
+  const noVisitMonth = sites.filter(s => !isThisMonth(s.lastVisit)).length;
+  const neverVisited = sites.filter(s => !s.lastVisit).length;
+  const visitsMonth = sites.reduce((sum,s)=> sum + (s.visitDates||[]).filter(isThisMonth).length, 0);
+  document.getElementById('kpiTotal').textContent = total;
+  document.getElementById('kpiNoVisitMonth').textContent = noVisitMonth;
+  document.getElementById('kpiNeverVisited').textContent = neverVisited;
+  document.getElementById('kpiVisitsMonth').textContent = visitsMonth;
+}
+
+function renderRecent(){
+  const sorted = [...sites].sort((a,b)=> new Date(b.lastEdited||0) - new Date(a.lastEdited||0)).slice(0,10);
+  const el = document.getElementById('recentList');
+  if(!sorted.length){ el.innerHTML = `<div class="empty">데이터가 없습니다.</div>`; return; }
+  el.innerHTML = sorted.map(s => `
+    <div class="site-card">
+      <div class="site-top"><span class="site-name">${s.name}</span><span class="badge">${s.site||'기타'}</span></div>
+      <div class="site-meta">최근 방문: ${fmtDate(s.lastVisit)} · 연락요청: ${fmtDate(s.contactRequest)}</div>
+    </div>`).join('');
+}
+
+function renderSites(){
+  const el = document.getElementById('siteList');
+  if(!sites.length){ el.innerHTML = `<div class="empty">데이터가 없습니다.</div>`; return; }
+  const groups = {};
+  sites.forEach(s => { const k = s.site || '기타'; (groups[k] = groups[k]||[]).push(s); });
+  el.innerHTML = Object.entries(groups).map(([k,list]) => `
+    <div class="site-card">
+      <div class="site-top"><span class="site-name">${k}</span><span class="badge">${list.length}건</span></div>
+    </div>`).join('');
+}
+
+function renderContact(){
+  const list = sites.filter(s => s.contactRequest).sort((a,b)=> new Date(a.contactRequest) - new Date(b.contactRequest));
+  const el = document.getElementById('contactList');
+  if(!list.length){ el.innerHTML = `<div class="empty">연락요청 데이터가 없습니다.</div>`; return; }
+  el.innerHTML = list.map(s => `
+    <div class="site-card">
+      <div class="site-top"><span class="site-name">${s.name}</span><span class="badge warn">${fmtDate(s.contactRequest)}</span></div>
+      <div class="site-meta">담당자: ${s.managerName||'-'} · 연락처: ${s.contact||'-'}</div>
+      <div class="site-actions">
+        <button class="btn primary" onclick="markContact('${s.id}')">연락완료</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderVisit(){
+  const list = [...sites].sort((a,b)=> new Date(a.end||'2999-01-01') - new Date(b.end||'2999-01-01')).slice(0,20);
+  const el = document.getElementById('visitList');
+  if(!list.length){ el.innerHTML = `<div class="empty">데이터가 없습니다.</div>`; return; }
+  el.innerHTML = list.map(s => `
+    <div class="site-card">
+      <div class="site-top"><span class="site-name">${s.name}</span><span class="badge">준공 ${fmtDate(s.end)}</span></div>
+      <div class="site-meta">최근 방문: ${fmtDate(s.lastVisit)}</div>
+      <div class="site-actions">
+        <button class="btn primary" onclick="markVisit('${s.id}')">오늘 방문 처리</button>
+      </div>
+    </div>`).join('');
+}
+
+async function markVisit(pageId){
+  await fetch(`${API_BASE}/api/update-visit`, { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ pageId, propertyName:'방문일자', date: new Date().toISOString().slice(0,10) }) });
+  await loadContracts();
+}
+async function markContact(pageId){
+  await fetch(`${API_BASE}/api/update-visit`, { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ pageId, propertyName:'연락요청일자', date: null }) });
+  await loadContracts();
+}
+
+function renderAll(){ renderKpis(); renderRecent(); renderSites(); renderContact(); renderVisit(); }
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    ['overview','sites','contact','visit'].forEach(name => {
+      document.getElementById('panel-'+name).style.display = (name===tab.dataset.tab) ? '' : 'none';
+    });
+  });
+});
+
+const themeToggle = document.getElementById('themeToggle');
+let theme = matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light';
+document.documentElement.setAttribute('data-theme', theme);
+themeToggle.addEventListener('click', () => {
+  theme = theme==='dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+  themeToggle.textContent = theme==='dark' ? '☀️' : '🌙';
+});
+
+const aiFab = document.getElementById('aiFab');
+const sheetOverlay = document.getElementById('sheetOverlay');
+const aiSheet = document.getElementById('aiSheet');
+function openSheet(){ sheetOverlay.classList.add('open'); aiSheet.classList.add('open'); }
+function closeSheet(){ sheetOverlay.classList.remove('open'); aiSheet.classList.remove('open'); }
+aiFab.addEventListener('click', openSheet);
+sheetOverlay.addEventListener('click', closeSheet);
+document.getElementById('aiCancel').addEventListener('click', closeSheet);
+document.getElementById('aiSend').addEventListener('click', async () => {
+  const text = document.getElementById('aiInput').value.trim();
+  if(!text) return;
+  document.getElementById('aiResult').textContent = '처리 중...';
+  try{
+    const res = await fetch(`${API_BASE}/api/ai-command`, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ text, siteNames: sites.map(s=>s.name) }) });
+    const data = await res.json();
+    document.getElementById('aiResult').textContent = data.result?.answer || JSON.stringify(data.result);
+    await loadContracts();
+  }catch(e){
+    document.getElementById('aiResult').textContent = 'AI 서버 연결 실패';
+  }
+});
+
+loadContracts();
+</script>
+</body>
+</html>
