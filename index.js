@@ -3,22 +3,22 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { Client } from "@notionhq/client";
 import fetch from "node-fetch";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
 const app = express();
 app.use(cors({ origin: process.env.ALLOWED_ORIGIN || "*" }));
-import path from 'path';
-import { fileURLToPath } from 'url';
+app.use(express.json());
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 app.use(express.static(__dirname));
-app.use(express.json());
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const DB_ID = process.env.NOTION_DATABASE_ID;
+
 
 // ---- helper: convert one Notion page -> site object used by frontend ----
 function pageToSite(page) {
@@ -70,6 +70,7 @@ function pageToSite(page) {
   };
 }
 
+
 // ---- GET all contract sites from Notion ----
 app.get("/api/contracts", async (req, res) => {
   try {
@@ -87,9 +88,6 @@ app.get("/api/contracts", async (req, res) => {
 
     const rawSites = results.map(pageToSite);
 
-    // 공사명 기준으로 그룹핑 -> 여러 페이지로 나뉘어 있어도 방문일자/연락요청일자를 모두 배열로 합침
-    // 각 날짜가 어느 노션 페이지(pageId)에서 왔는지도 pageDetails에 함께 기록해서, 프론트엔드가
-    // 날짜별로 정확한 페이지를 찾아 이동/삭제할 수 있도록 한다.
     const grouped = {};
     rawSites.forEach((s) => {
       const key = s.name;
@@ -108,7 +106,6 @@ app.get("/api/contracts", async (req, res) => {
         if (s.contactRequest && !g.contactDates.includes(s.contactRequest)) g.contactDates.push(s.contactRequest);
         g.pageIds.push(s.id);
         g.pageDetails.push(detail);
-        // 가장 최근 수정된 페이지 정보(비고, 상태 등)로 대표값 갱신
         if (new Date(s.lastEdited) > new Date(g.lastEdited)) {
           Object.assign(g, s, { visitDates: g.visitDates, contactDates: g.contactDates, pageIds: g.pageIds, pageDetails: g.pageDetails });
         }
@@ -132,9 +129,7 @@ app.get("/api/contracts", async (req, res) => {
   }
 });
 
-// ---- PATCH update visit date / contact date on a page ----
-// date는 날짜 문자열(저장) 또는 null(삭제)을 허용한다.
-// undefined일 때만("date" 키 자체가 안 온 경우) 오류로 처리한다.
+
 app.post("/api/update-visit", async (req, res) => {
   try {
     const { pageId, propertyName, date } = req.body;
@@ -160,7 +155,7 @@ app.post("/api/update-visit", async (req, res) => {
   }
 });
 
-// ---- POST ai weekly schedule via DeepSeek ----
+
 app.post("/api/ai-schedule", async (req, res) => {
   try {
     const { sites, rules } = req.body;
@@ -190,7 +185,7 @@ app.post("/api/ai-schedule", async (req, res) => {
   }
 });
 
-// ---- POST voice/text AI command -> structured intent ----
+
 app.post("/api/ai-command", async (req, res) => {
   try {
     const { text, siteNames } = req.body;
@@ -245,9 +240,7 @@ app.post("/api/ai-command", async (req, res) => {
   }
 });
 
-// ---- POST duplicate a Notion page (for storing multiple dates per site) ----
-// 같은 현장에 날짜를 하나 더 추가할 때, 기존 페이지를 복제하여 새 페이지에 새 날짜만 기록한다.
-// 노션 속성 구조를 전혀 바꾸지 않고도 날짜별 이력을 그대로 보존할 수 있다.
+
 const NON_COPYABLE_TYPES = ["formula", "rollup", "created_time", "created_by", "last_edited_time", "last_edited_by", "unique_id"];
 
 app.post("/api/duplicate-page", async (req, res) => {
@@ -277,7 +270,6 @@ app.post("/api/duplicate-page", async (req, res) => {
       else if (prop.type === "relation") newProperties[key] = { relation: prop.relation };
     }
 
-    // 새로 만든 페이지에는 지정한 속성에만 새 날짜를 설정 (다른 속성은 원본과 동일하게 복제됨)
     newProperties[propertyName] = { date: { start: date } };
 
     const newPage = await notion.pages.create({
@@ -292,7 +284,7 @@ app.post("/api/duplicate-page", async (req, res) => {
   }
 });
 
-// ---- DEBUG: 실제 Notion 속성 이름 확인용 ----
+
 app.get("/api/debug-schema", async (req, res) => {
   try {
     const resp = await notion.databases.retrieve({ database_id: DB_ID });
@@ -305,6 +297,7 @@ app.get("/api/debug-schema", async (req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
 
 app.get("/", (req, res) => res.send("Safety Dashboard API server running."));
 
