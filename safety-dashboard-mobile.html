@@ -2,263 +2,264 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>안전관리 대시보드</title>
 <style>
-:root{
-  --bg:#f7f6f2; --surface:#ffffff; --surface2:#f3f0ec; --border:#dcd9d5;
-  --text:#28251d; --muted:#7a7974; --primary:#01696f; --primary-h:#0c4e54;
-  --warn:#964219; --err:#a12c7b; --ok:#437a22; --radius:12px;
-}
-[data-theme="dark"]{
-  --bg:#171614; --surface:#1c1b19; --surface2:#201f1d; --border:#393836;
-  --text:#cdccca; --muted:#9a9995; --primary:#4f98a3; --primary-h:#227f8b;
-  --warn:#bb653b; --err:#d163a7; --ok:#6daa45;
-}
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);
-  -webkit-font-smoothing:antialiased; padding-bottom:80px;}
-header{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);
-  padding:12px 16px;display:flex;align-items:center;justify-content:space-between;}
-header h1{font-size:18px;font-weight:700;}
-.icon-btn{width:40px;height:40px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;border:none;color:var(--text);}
-main{padding:12px;max-width:640px;margin:0 auto;}
-.kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;}
-.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;}
-.kpi .label{font-size:12px;color:var(--muted);margin-bottom:4px;}
-.kpi .value{font-size:22px;font-weight:800;}
-.section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden;}
-.section-header{padding:12px 14px;font-weight:700;font-size:14px;border-bottom:1px solid var(--border);
-  display:flex;align-items:center;justify-content:space-between;}
-.tabs{display:flex;gap:6px;padding:8px 12px;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--border);
-  position:sticky;top:57px;z-index:15;}
-.tab{flex:0 0 auto;padding:8px 14px;border-radius:999px;font-size:13px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);white-space:nowrap;}
-.tab.active{background:var(--primary);color:#fff;border-color:var(--primary);}
-.site-card{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:4px;}
-.site-card:last-child{border-bottom:none;}
-.site-top{display:flex;justify-content:space-between;align-items:center;}
-.site-name{font-weight:700;font-size:14px;}
-.badge{font-size:11px;padding:3px 8px;border-radius:999px;background:var(--surface2);color:var(--muted);}
-.badge.warn{background:color-mix(in oklab, var(--warn) 18%, var(--surface));color:var(--warn);}
-.badge.ok{background:color-mix(in oklab, var(--ok) 18%, var(--surface));color:var(--ok);}
-.site-meta{font-size:12px;color:var(--muted);}
-.site-actions{display:flex;gap:6px;margin-top:6px;}
-.btn{flex:1;padding:8px 0;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;font-weight:600;}
-.btn.primary{background:var(--primary);color:#fff;border-color:var(--primary);}
-.empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
-.fab{position:fixed;bottom:20px;right:20px;width:56px;height:56px;border-radius:50%;background:var(--primary);color:#fff;
-  border:none;font-size:22px;box-shadow:0 6px 16px rgba(0,0,0,.2);z-index:30;}
-.sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:40;display:none;}
-.sheet-overlay.open{display:block;}
-.sheet{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-radius:16px 16px 0 0;padding:16px;
-  transform:translateY(100%);transition:transform .25s cubic-bezier(.16,1,.3,1);z-index:41;max-height:80vh;overflow-y:auto;}
-.sheet.open{transform:translateY(0);}
-.sheet h3{font-size:16px;margin-bottom:12px;}
-.sheet textarea{width:100%;min-height:70px;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:14px;background:var(--surface2);color:var(--text);}
-.sheet .row{display:flex;gap:8px;margin-top:10px;}
-.sheet .row .btn{flex:1;padding:10px 0;}
-.loading{display:flex;justify-content:center;padding:24px;color:var(--muted);font-size:13px;}
-::selection{background:color-mix(in oklab, var(--primary) 25%, transparent);}
-@media (min-width:700px){
-  main{max-width:720px;}
-  .kpi-grid{grid-template-columns:repeat(4,1fr);}
+:root{--bg:#f6f4ef;--panel:#fffdf8;--panel2:#f2efe8;--line:#d7d1c7;--text:#26221c;--muted:#6f6b64;--primary:#01696f;--primary2:#0b4c51;--accent:#e7f1f0;--danger:#b65252;--shadow:0 8px 24px rgba(31,22,10,.08);--radius:14px}
+*{box-sizing:border-box} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text)}
+.app{display:grid;grid-template-columns:320px 1fr;min-height:100vh}
+.sidebar{background:var(--panel);border-right:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:14px}
+.main{padding:16px 18px 28px}
+.brand{font-size:20px;font-weight:800}.muted{color:var(--muted)}
+.search-wrap{display:flex;flex-direction:column;gap:10px}.search-box{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.search-list{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 220px);overflow:auto}
+.search-item{padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);cursor:grab}
+.search-item strong{display:block;font-size:14px}.search-item span{display:block;font-size:12px;color:var(--muted);margin-top:4px}
+.search-item.dragging{opacity:.45}
+.search-title{display:flex;justify-content:space-between;align-items:center;gap:8px}.pill{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:var(--accent);color:var(--primary2);font-size:12px;font-weight:700}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px}.topbar h1{margin:0;font-size:24px}.hint{font-size:13px;color:var(--muted)}
+.calendar-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.cal-header{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:#fcfbf7}
+.calendar{display:grid;grid-template-columns:repeat(7,1fr)}
+.dow,.day{border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.dow:nth-child(7),.day:nth-child(7n){border-right:none}.dow{padding:10px;font-size:12px;font-weight:700;color:var(--muted);background:var(--panel2);text-align:center}
+.day{min-height:138px;background:var(--panel);padding:8px;display:flex;flex-direction:column;gap:8px;position:relative}
+.day.other{background:#faf8f4;color:#a9a299}.day.drop-target{outline:2px dashed var(--primary);outline-offset:-4px;background:#f4fbfa}
+.day-head{display:flex;justify-content:space-between;align-items:center}.day-num{font-size:14px;font-weight:800}.add-btn{border:none;background:var(--accent);color:var(--primary2);width:28px;height:28px;border-radius:999px;font-weight:800;cursor:pointer}
+.event-list{display:flex;flex-direction:column;gap:6px}.event{padding:8px 9px;border-radius:10px;font-size:12px;line-height:1.35;background:#eef5f5;border:1px solid #d8e7e6;cursor:pointer}
+.event.visit{background:#ebf5ff;border-color:#d5e7ff}.event.contact{background:#fff2e7;border-color:#f1ddcb}.event .meta{display:block;color:var(--muted);margin-top:3px;font-size:11px}
+.mobile-panel{display:none}
+.mobile-sheet-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:40}.mobile-sheet-backdrop.open{display:block}
+.mobile-sheet{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-radius:18px 18px 0 0;z-index:41;padding:16px;transform:translateY(100%);transition:transform .22s ease;max-height:78vh;overflow:auto}.mobile-sheet.open{transform:translateY(0)}
+.mobile-sheet h3{margin:0 0 10px;font-size:17px}.mobile-actions{display:flex;gap:8px;margin-top:10px}.btn{border:none;background:var(--panel2);padding:11px 14px;border-radius:12px;cursor:pointer}.btn.primary{background:var(--primary);color:#fff}
+.selected-date{font-size:13px;color:var(--primary2);font-weight:700}
+@media (max-width: 900px){
+  .app{grid-template-columns:1fr}
+  .sidebar{display:none}
+  .main{padding:10px}
+  .mobile-panel{display:block;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px}
+  .topbar{margin-bottom:10px}
+  .topbar h1{font-size:20px}
+  .calendar{grid-template-columns:repeat(7,minmax(0,1fr))}
+  .day{min-height:102px;padding:6px;gap:6px}
+  .day-num{font-size:13px}
+  .event{padding:6px 7px;font-size:11px}
+  .event .meta{display:none}
 }
 </style>
 </head>
 <body>
-<header>
-  <h1>안전관리 대시보드</h1>
-  <button class="icon-btn" id="themeToggle" aria-label="테마 전환">🌙</button>
-</header>
+<div class="app">
+  <aside class="sidebar">
+    <div>
+      <div class="brand">일정 삽입</div>
+      <div class="muted" style="margin-top:4px;font-size:13px">PC에서는 드래그해서 날짜칸에 놓고, 모바일에서는 날짜를 눌러 삽입합니다.</div>
+    </div>
+    <div class="search-wrap">
+      <div class="search-title"><span class="pill" id="desktopModePill">PC 검색창</span><span class="selected-date" id="selectedDateLabel">날짜 선택 전</span></div>
+      <input id="searchInput" class="search-box" type="search" placeholder="공사명 또는 회사명 검색">
+      <div id="searchList" class="search-list"></div>
+    </div>
+  </aside>
 
-<div class="tabs" id="tabs">
-  <button class="tab active" data-tab="overview">개요</button>
-  <button class="tab" data-tab="sites">사이트 현황</button>
-  <button class="tab" data-tab="contact">연락요청</button>
-  <button class="tab" data-tab="visit">방문관리</button>
+  <main class="main">
+    <div class="mobile-panel">
+      <div style="font-weight:800;font-size:16px">캘린더 일정 삽입</div>
+      <div class="hint" style="margin-top:4px">모바일에서는 날짜를 먼저 누른 뒤, 검색해서 삽입하세요.</div>
+    </div>
+
+    <div class="topbar">
+      <div>
+        <h1>방문/연락 일정 캘린더</h1>
+        <div class="hint">방문일정과 연락요청을 날짜별로 배치하고 관리합니다.</div>
+      </div>
+      <div class="pill" id="viewPill">PC 드래그앤드롭</div>
+    </div>
+
+    <section class="calendar-card">
+      <div class="cal-header">
+        <strong id="monthLabel">2026년 7월</strong>
+        <span class="hint">날짜 클릭 또는 드래그 배치</span>
+      </div>
+      <div class="calendar" id="calendarGrid"></div>
+    </section>
+  </main>
 </div>
 
-<main>
-  <div class="kpi-grid" id="kpiGrid">
-    <div class="kpi"><div class="label">전체 현장</div><div class="value" id="kpiTotal">-</div></div>
-    <div class="kpi"><div class="label">이번달 미방문</div><div class="value" id="kpiNoVisitMonth">-</div></div>
-    <div class="kpi"><div class="label">1회도 방문없음</div><div class="value" id="kpiNeverVisited">-</div></div>
-    <div class="kpi"><div class="label">이번달 총 방문</div><div class="value" id="kpiVisitsMonth">-</div></div>
+<div class="mobile-sheet-backdrop" id="mobileBackdrop"></div>
+<div class="mobile-sheet" id="mobileSheet">
+  <h3>일정 삽입</h3>
+  <div class="selected-date" id="sheetSelectedDate">날짜를 선택하세요</div>
+  <input id="mobileSearchInput" class="search-box" type="search" placeholder="공사명 또는 회사명 검색" style="margin-top:10px">
+  <div id="mobileSearchList" class="search-list" style="max-height:45vh;margin-top:10px"></div>
+  <div class="mobile-actions">
+    <button class="btn" id="sheetCloseBtn">닫기</button>
   </div>
-
-  <div class="section" id="panel-overview">
-    <div class="section-header">최근 활동</div>
-    <div id="recentList"><div class="loading">불러오는 중...</div></div>
-  </div>
-
-  <div class="section" id="panel-sites" style="display:none;">
-    <div class="section-header">사이트 현황</div>
-    <div id="siteList"><div class="loading">불러오는 중...</div></div>
-  </div>
-
-  <div class="section" id="panel-contact" style="display:none;">
-    <div class="section-header">연락요청</div>
-    <div id="contactList"><div class="loading">불러오는 중...</div></div>
-  </div>
-
-  <div class="section" id="panel-visit" style="display:none;">
-    <div class="section-header">준공 임박 / 방문관리</div>
-    <div id="visitList"><div class="loading">불러오는 중...</div></div>
-  </div>
-</main>
-
-<button class="fab" id="aiFab" aria-label="AI 명령">✨</button>
-
-<div class="sheet-overlay" id="sheetOverlay"></div>
-<div class="sheet" id="aiSheet">
-  <h3>AI에게 지시하기</h3>
-  <textarea id="aiInput" placeholder="예: OO현장 오늘 방문 처리해줘"></textarea>
-  <div class="row">
-    <button class="btn" id="aiCancel">취소</button>
-    <button class="btn primary" id="aiSend">보내기</button>
-  </div>
-  <div id="aiResult" style="margin-top:12px;font-size:13px;color:var(--muted);"></div>
 </div>
 
 <script>
-const API_BASE = "http://localhost:3000"; // Render 배포 URL로 교체하세요
+const API_BASE = "https://safety-dashboard-server.onrender.com";
+const isMobile = window.matchMedia('(max-width: 900px)').matches;
+const today = new Date();
+const viewYear = today.getFullYear();
+const viewMonth = today.getMonth();
 let sites = [];
+let calendarMap = {};
+let selectedDate = null;
+let dragSiteId = null;
 
-function fmtDate(d){ return d ? d : '-'; }
-function isThisMonth(dateStr){
-  if(!dateStr) return false;
-  const d = new Date(dateStr), now = new Date();
-  return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+const monthLabel = document.getElementById('monthLabel');
+const calendarGrid = document.getElementById('calendarGrid');
+const searchInput = document.getElementById('searchInput');
+const searchList = document.getElementById('searchList');
+const mobileSearchInput = document.getElementById('mobileSearchInput');
+const mobileSearchList = document.getElementById('mobileSearchList');
+const selectedDateLabel = document.getElementById('selectedDateLabel');
+const sheetSelectedDate = document.getElementById('sheetSelectedDate');
+const mobileBackdrop = document.getElementById('mobileBackdrop');
+const mobileSheet = document.getElementById('mobileSheet');
+const viewPill = document.getElementById('viewPill');
+if (isMobile) viewPill.textContent = '모바일 날짜클릭';
+
+function fmtDate(d){return d.toISOString().slice(0,10)}
+function monthTitle(y,m){return `${y}년 ${m+1}월`}
+function addEventToMap(date, item){ if(!date) return; if(!calendarMap[date]) calendarMap[date]=[]; calendarMap[date].push(item); }
+function escapeHtml(s=''){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function loadData(){
+  const res = await fetch(`${API_BASE}/api/contracts`);
+  const data = await res.json();
+  sites = data.sites || [];
+  rebuildCalendarMap();
+  renderCalendar();
+  renderSearch(searchInput.value || '', searchList, false);
+  renderSearch(mobileSearchInput.value || '', mobileSearchList, true);
 }
 
-async function loadContracts(){
-  try{
-    const res = await fetch(`${API_BASE}/api/contracts`);
-    const data = await res.json();
-    sites = data.sites || [];
-    renderAll();
-  }catch(e){
-    document.getElementById('recentList').innerHTML = `<div class="empty">데이터를 불러오지 못했습니다.<br>서버 주소를 확인하세요.</div>`;
+function rebuildCalendarMap(){
+  calendarMap = {};
+  sites.forEach(site => {
+    (site.visitDates || (site.lastVisit ? [site.lastVisit] : [])).forEach(date => addEventToMap(date, {type:'visit', title:site.name, company:site.company, siteId:site.id}));
+    (site.contactDates || (site.contactRequest ? [site.contactRequest] : [])).forEach(date => addEventToMap(date, {type:'contact', title:site.name, company:site.company, siteId:site.id}));
+  });
+}
+
+function renderCalendar(){
+  monthLabel.textContent = monthTitle(viewYear, viewMonth);
+  const dows = ['일','월','화','수','목','금','토'];
+  const first = new Date(viewYear, viewMonth, 1);
+  const last = new Date(viewYear, viewMonth + 1, 0);
+  const prevLast = new Date(viewYear, viewMonth, 0);
+  const startOffset = first.getDay();
+  const total = Math.ceil((startOffset + last.getDate()) / 7) * 7;
+  let html = dows.map(d => `<div class="dow">${d}</div>`).join('');
+  for(let i=0;i<total;i++){
+    let dayNum, dateObj, other=false;
+    if(i < startOffset){ dayNum = prevLast.getDate() - startOffset + i + 1; dateObj = new Date(viewYear, viewMonth-1, dayNum); other=true; }
+    else if(i >= startOffset + last.getDate()){ dayNum = i - (startOffset + last.getDate()) + 1; dateObj = new Date(viewYear, viewMonth+1, dayNum); other=true; }
+    else { dayNum = i - startOffset + 1; dateObj = new Date(viewYear, viewMonth, dayNum); }
+    const dateKey = fmtDate(dateObj);
+    const items = calendarMap[dateKey] || [];
+    html += `<div class="day ${other ? 'other' : ''}" data-date="${dateKey}">
+      <div class="day-head"><span class="day-num">${dayNum}</span><button class="add-btn" data-date-btn="${dateKey}">+</button></div>
+      <div class="event-list">${items.slice(0,3).map(ev => `<div class="event ${ev.type}"><strong>${escapeHtml(ev.title)}</strong><span class="meta">${ev.type==='visit' ? '방문일정' : '연락요청'} · ${escapeHtml(ev.company || '')}</span></div>`).join('')}${items.length>3 ? `<div class="hint">+${items.length-3}건 더보기</div>` : ''}</div>
+    </div>`;
+  }
+  calendarGrid.innerHTML = html;
+  bindCalendarEvents();
+}
+
+function bindCalendarEvents(){
+  document.querySelectorAll('[data-date-btn]').forEach(btn => btn.addEventListener('click', e => {
+    e.stopPropagation();
+    openDatePicker(btn.dataset.dateBtn);
+  }));
+  document.querySelectorAll('.day').forEach(day => {
+    day.addEventListener('click', e => {
+      if(e.target.closest('.event')) return;
+      openDatePicker(day.dataset.date);
+    });
+    if(!isMobile){
+      day.addEventListener('dragover', e => { e.preventDefault(); day.classList.add('drop-target'); });
+      day.addEventListener('dragleave', () => day.classList.remove('drop-target'));
+      day.addEventListener('drop', async e => {
+        e.preventDefault();
+        day.classList.remove('drop-target');
+        const id = e.dataTransfer.getData('text/plain') || dragSiteId;
+        if(!id) return;
+        await addScheduleBySiteId(id, day.dataset.date);
+      });
+    }
+  });
+}
+
+function openDatePicker(date){
+  selectedDate = date;
+  selectedDateLabel.textContent = `${date} 선택됨`;
+  sheetSelectedDate.textContent = `${date} 에 일정 삽입`;
+  if(isMobile){
+    mobileBackdrop.classList.add('open');
+    mobileSheet.classList.add('open');
+    mobileSearchInput.focus();
+    renderSearch(mobileSearchInput.value || '', mobileSearchList, true);
+  }else{
+    searchInput.focus();
+    renderSearch(searchInput.value || '', searchList, false);
   }
 }
 
-function renderKpis(){
-  const total = sites.length;
-  const noVisitMonth = sites.filter(s => !isThisMonth(s.lastVisit)).length;
-  const neverVisited = sites.filter(s => !s.lastVisit).length;
-  const visitsMonth = sites.reduce((sum,s)=> sum + (s.visitDates||[]).filter(isThisMonth).length, 0);
-  document.getElementById('kpiTotal').textContent = total;
-  document.getElementById('kpiNoVisitMonth').textContent = noVisitMonth;
-  document.getElementById('kpiNeverVisited').textContent = neverVisited;
-  document.getElementById('kpiVisitsMonth').textContent = visitsMonth;
+function closeSheet(){ mobileBackdrop.classList.remove('open'); mobileSheet.classList.remove('open'); }
+mobileBackdrop.addEventListener('click', closeSheet);
+document.getElementById('sheetCloseBtn').addEventListener('click', closeSheet);
+
+function filteredSites(q){
+  const query = (q || '').trim().toLowerCase();
+  const arr = !query ? sites : sites.filter(s => (s.name || '').toLowerCase().includes(query) || (s.company || '').toLowerCase().includes(query));
+  return arr.slice(0, 50);
 }
 
-function renderRecent(){
-  const sorted = [...sites].sort((a,b)=> new Date(b.lastEdited||0) - new Date(a.lastEdited||0)).slice(0,10);
-  const el = document.getElementById('recentList');
-  if(!sorted.length){ el.innerHTML = `<div class="empty">데이터가 없습니다.</div>`; return; }
-  el.innerHTML = sorted.map(s => `
-    <div class="site-card">
-      <div class="site-top"><span class="site-name">${s.name}</span><span class="badge">${s.site||'기타'}</span></div>
-      <div class="site-meta">최근 방문: ${fmtDate(s.lastVisit)} · 연락요청: ${fmtDate(s.contactRequest)}</div>
+function renderSearch(q, target, mobileMode){
+  const list = filteredSites(q);
+  if(!list.length){ target.innerHTML = `<div class="muted" style="padding:10px">검색 결과가 없습니다.</div>`; return; }
+  target.innerHTML = list.map(site => `
+    <div class="search-item" draggable="${mobileMode ? 'false' : 'true'}" data-site-id="${site.id}">
+      <strong>${escapeHtml(site.name)}</strong>
+      <span>${escapeHtml(site.company || '회사명 없음')}</span>
     </div>`).join('');
-}
-
-function renderSites(){
-  const el = document.getElementById('siteList');
-  if(!sites.length){ el.innerHTML = `<div class="empty">데이터가 없습니다.</div>`; return; }
-  const groups = {};
-  sites.forEach(s => { const k = s.site || '기타'; (groups[k] = groups[k]||[]).push(s); });
-  el.innerHTML = Object.entries(groups).map(([k,list]) => `
-    <div class="site-card">
-      <div class="site-top"><span class="site-name">${k}</span><span class="badge">${list.length}건</span></div>
-    </div>`).join('');
-}
-
-function renderContact(){
-  const list = sites.filter(s => s.contactRequest).sort((a,b)=> new Date(a.contactRequest) - new Date(b.contactRequest));
-  const el = document.getElementById('contactList');
-  if(!list.length){ el.innerHTML = `<div class="empty">연락요청 데이터가 없습니다.</div>`; return; }
-  el.innerHTML = list.map(s => `
-    <div class="site-card">
-      <div class="site-top"><span class="site-name">${s.name}</span><span class="badge warn">${fmtDate(s.contactRequest)}</span></div>
-      <div class="site-meta">담당자: ${s.managerName||'-'} · 연락처: ${s.contact||'-'}</div>
-      <div class="site-actions">
-        <button class="btn primary" onclick="markContact('${s.id}')">연락완료</button>
-      </div>
-    </div>`).join('');
-}
-
-function renderVisit(){
-  const list = [...sites].sort((a,b)=> new Date(a.end||'2999-01-01') - new Date(b.end||'2999-01-01')).slice(0,20);
-  const el = document.getElementById('visitList');
-  if(!list.length){ el.innerHTML = `<div class="empty">데이터가 없습니다.</div>`; return; }
-  el.innerHTML = list.map(s => `
-    <div class="site-card">
-      <div class="site-top"><span class="site-name">${s.name}</span><span class="badge">준공 ${fmtDate(s.end)}</span></div>
-      <div class="site-meta">최근 방문: ${fmtDate(s.lastVisit)}</div>
-      <div class="site-actions">
-        <button class="btn primary" onclick="markVisit('${s.id}')">오늘 방문 처리</button>
-      </div>
-    </div>`).join('');
-}
-
-async function markVisit(pageId){
-  await fetch(`${API_BASE}/api/update-visit`, { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ pageId, propertyName:'방문일자', date: new Date().toISOString().slice(0,10) }) });
-  await loadContracts();
-}
-async function markContact(pageId){
-  await fetch(`${API_BASE}/api/update-visit`, { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ pageId, propertyName:'연락요청일자', date: null }) });
-  await loadContracts();
-}
-
-function renderAll(){ renderKpis(); renderRecent(); renderSites(); renderContact(); renderVisit(); }
-
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-    tab.classList.add('active');
-    ['overview','sites','contact','visit'].forEach(name => {
-      document.getElementById('panel-'+name).style.display = (name===tab.dataset.tab) ? '' : 'none';
+  target.querySelectorAll('.search-item').forEach(el => {
+    const siteId = el.dataset.siteId;
+    if(!mobileMode){
+      el.addEventListener('dragstart', e => { dragSiteId = siteId; e.dataTransfer.setData('text/plain', siteId); el.classList.add('dragging'); });
+      el.addEventListener('dragend', () => { dragSiteId = null; el.classList.remove('dragging'); });
+    }
+    el.addEventListener('click', async () => {
+      if(!selectedDate) { alert('먼저 날짜를 선택하세요.'); return; }
+      await addScheduleBySiteId(siteId, selectedDate);
+      if(mobileMode) closeSheet();
     });
   });
-});
+}
 
-const themeToggle = document.getElementById('themeToggle');
-let theme = matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light';
-document.documentElement.setAttribute('data-theme', theme);
-themeToggle.addEventListener('click', () => {
-  theme = theme==='dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', theme);
-  themeToggle.textContent = theme==='dark' ? '☀️' : '🌙';
-});
+searchInput.addEventListener('input', e => renderSearch(e.target.value, searchList, false));
+mobileSearchInput.addEventListener('input', e => renderSearch(e.target.value, mobileSearchList, true));
 
-const aiFab = document.getElementById('aiFab');
-const sheetOverlay = document.getElementById('sheetOverlay');
-const aiSheet = document.getElementById('aiSheet');
-function openSheet(){ sheetOverlay.classList.add('open'); aiSheet.classList.add('open'); }
-function closeSheet(){ sheetOverlay.classList.remove('open'); aiSheet.classList.remove('open'); }
-aiFab.addEventListener('click', openSheet);
-sheetOverlay.addEventListener('click', closeSheet);
-document.getElementById('aiCancel').addEventListener('click', closeSheet);
-document.getElementById('aiSend').addEventListener('click', async () => {
-  const text = document.getElementById('aiInput').value.trim();
-  if(!text) return;
-  document.getElementById('aiResult').textContent = '처리 중...';
-  try{
-    const res = await fetch(`${API_BASE}/api/ai-command`, { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ text, siteNames: sites.map(s=>s.name) }) });
-    const data = await res.json();
-    document.getElementById('aiResult').textContent = data.result?.answer || JSON.stringify(data.result);
-    await loadContracts();
-  }catch(e){
-    document.getElementById('aiResult').textContent = 'AI 서버 연결 실패';
-  }
-});
+async function addScheduleBySiteId(siteId, date){
+  const site = sites.find(s => s.id === siteId);
+  if(!site) return;
+  const mode = prompt(`삽입할 일정 종류를 입력하세요: visit 또는 contact`, 'visit');
+  if(!mode) return;
+  const propertyName = mode === 'contact' ? '연락요청 일자' : '방문일자';
+  const sourcePageId = site.pageIds?.[0] || site.id;
+  const resp = await fetch(`${API_BASE}/api/duplicate-page`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ sourcePageId, propertyName, date })
+  });
+  const result = await resp.json();
+  if(!result.ok){ alert(result.error || '일정 추가 실패'); return; }
+  await loadData();
+}
 
-loadContracts();
+loadData().catch(() => { document.body.innerHTML = '<div style="padding:24px;font-family:sans-serif">데이터를 불러오지 못했습니다. 서버 주소를 확인하세요.</div>'; });
 </script>
 </body>
 </html>
