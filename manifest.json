@@ -1,0 +1,9 @@
+{
+  "name": "안전관리 통합 대시보드",
+  "short_name": "안전대시보드",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f6f9",
+  "theme_color": "#2563eb",
+  "icons": []
+}
