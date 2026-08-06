@@ -1,0 +1,13 @@
+{
+  "name": "safety-dashboard-github-pages",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync:notion": "node scripts/fetch-notion.mjs"
+  },
+  "dependencies": {
+    "@notionhq/client": "^2.2.15",
+    "dotenv": "^16.6.1"
+  }
+}
