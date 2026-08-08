@@ -909,7 +909,7 @@ function findPageIdFromServerDetails(site,storeType,date){
 }
 
 
-async function syncAddDate(storeType,siteName,date){
+async function syncAddDateCore(storeType,siteName,date){
   const site=sites.find(s=>s.name===siteName);
   if(!site){ console.warn('현장 정보 없음:',siteName); return; }
   const propertyName=getPropertyName(storeType);
@@ -935,7 +935,7 @@ async function syncAddDate(storeType,siteName,date){
 }
 
 
-async function syncMoveDate(storeType,siteName,oldDate,newDate){
+async function syncMoveDateCore(storeType,siteName,oldDate,newDate){
   const site=sites.find(s=>s.name===siteName);
   const propertyName=getPropertyName(storeType);
   const pageId = findPageIdForDate(storeType,siteName,oldDate)
@@ -952,7 +952,7 @@ async function syncMoveDate(storeType,siteName,oldDate,newDate){
 }
 
 
-async function syncDeleteDate(storeType,siteName,date){
+async function syncDeleteDateCore(storeType,siteName,date){
   const site=sites.find(s=>s.name===siteName);
   const propertyName=getPropertyName(storeType);
   const pageId = findPageIdForDate(storeType,siteName,date)
@@ -1442,16 +1442,16 @@ function refreshKPIs(){
 let companies = [];
 let currentCompanyCard = null;
 let notionRefreshTimer = null;
-const _origSyncAddDate = syncAddDate;
-const _origSyncMoveDate = syncMoveDate;
-const _origSyncDeleteDate = syncDeleteDate;
 function scheduleNotionRefresh(){
   clearTimeout(notionRefreshTimer);
   notionRefreshTimer = setTimeout(()=>loadFromNotion(), 450);
 }
-async function syncAddDate(storeType,siteName,date){ try{ await _origSyncAddDate(storeType,siteName,date); } finally { scheduleNotionRefresh(); } }
-async function syncMoveDate(storeType,siteName,oldDate,newDate){ try{ await _origSyncMoveDate(storeType,siteName,oldDate,newDate); } finally { scheduleNotionRefresh(); } }
-async function syncDeleteDate(storeType,siteName,date){ try{ await _origSyncDeleteDate(storeType,siteName,date); } finally { scheduleNotionRefresh(); } }
+// NOTE: syncAddDate / syncMoveDate / syncDeleteDate are the ONLY declarations of these
+// names in the file now. They call the *Core implementations (defined earlier, under
+// different names) so there is no duplicate-name hoisting collision and no self-recursion.
+async function syncAddDate(storeType,siteName,date){ try{ await syncAddDateCore(storeType,siteName,date); } finally { scheduleNotionRefresh(); } }
+async function syncMoveDate(storeType,siteName,oldDate,newDate){ try{ await syncMoveDateCore(storeType,siteName,oldDate,newDate); } finally { scheduleNotionRefresh(); } }
+async function syncDeleteDate(storeType,siteName,date){ try{ await syncDeleteDateCore(storeType,siteName,date); } finally { scheduleNotionRefresh(); } }
 
 function deriveCompaniesFromSites(){
   const grouped = {};
