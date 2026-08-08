@@ -10,14 +10,21 @@
 :root{--blue:#2563eb;--green:#16a34a;--orange:#f59e0b;--red:#ef4444;--purple:#8b5cf6;--gray:#64748b;--bg:#f4f6f9;--card:#ffffff;--border:#e2e8f0;--text:#1e293b;--muted:#64748b;}
 *{box-sizing:border-box;}
 body{margin:0;font-family:'Segoe UI',Malgun Gothic,sans-serif;background:var(--bg);color:var(--text);}
+body.mobile-nav-open{overflow:hidden;}
+.mobile-topbar{display:none;}
+.mobile-sidebar-backdrop{display:none;}
 .app-layout{display:flex;min-height:100vh;}
-.sidebar{width:190px;background:var(--card);border-right:1px solid var(--border);padding:16px 10px;position:sticky;top:0;height:100vh;flex-shrink:0;}
+.sidebar{width:190px;background:var(--card);border-right:1px solid var(--border);padding:16px 10px;position:sticky;top:0;height:100vh;flex-shrink:0;z-index:40;}
+.sidebar-mobile-head{display:block;}
 .sidebar h1{font-size:15px;margin:0 0 18px;padding:0 6px;}
+.sidebar-close-btn{display:none;}
 .sidebar nav{display:flex;flex-direction:column;gap:4px;}
 .sidebar nav button{padding:10px 12px;border:none;background:transparent;border-radius:8px;cursor:pointer;font-size:13.5px;color:var(--muted);text-align:left;}
 .sidebar nav button.active{background:var(--blue);color:white;}
 .sidebar .chat-btn{margin-top:20px;width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:#eff6ff;color:var(--blue);font-weight:600;cursor:pointer;font-size:13px;}
 .main-content{flex:1;padding:20px 24px;min-width:0;}
+.sync-floating-btn{position:fixed;bottom:16px;left:16px;padding:10px 14px;background:#16a34a;color:white;border:none;border-radius:8px;cursor:pointer;z-index:400;box-shadow:0 8px 20px rgba(22,163,74,0.22);}
+#notion-linked-banner{max-width:min(420px, calc(100vw - 24px)); word-break:keep-all;}
 .page{display:none;}
 .page.active{display:block;}
 .grid-top{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:16px;}
@@ -187,53 +194,77 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:12px;}
 .company-contract-item strong{display:block;color:#1e3a8a;margin-bottom:6px;}
 .company-empty{font-size:13px;color:#94a3b8;padding:18px;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc;}
 .company-summary-row{display:grid;grid-template-columns:1.3fr 0.7fr;gap:12px;margin-bottom:12px;}
-@media (max-width:800px){
-.modal-overlay{align-items:flex-start;padding:16px 8px 12px;}
-.modal-box{width:calc(100vw - 16px);max-width:calc(100vw - 16px);max-height:calc(100vh - 28px);padding:22px 14px 16px;}
+@media (max-width:1024px){
+.mobile-topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;position:fixed;top:0;left:0;right:0;height:64px;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 10px;background:rgba(255,255,255,0.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);z-index:1300;}
+.mobile-topbar-title{flex:1;min-width:0;font-size:15px;font-weight:800;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;}
+.mobile-menu-btn,.mobile-sync-btn{border:none;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer;flex-shrink:0;}
+.mobile-menu-btn{background:#e2e8f0;color:#0f172a;}
+.mobile-sync-btn{background:#dcfce7;color:#166534;}
+.mobile-sidebar-backdrop.active{display:block;position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:1190;}
+.app-layout{padding-top:calc(env(safe-area-inset-top,0px) + 64px);}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:min(82vw,320px);height:100vh;transform:translateX(-100%);transition:transform .22s ease, box-shadow .22s ease;padding:calc(env(safe-area-inset-top,0px) + 16px) 14px 24px;overflow-y:auto;box-shadow:none;z-index:1200;}
+.sidebar.open{transform:translateX(0);box-shadow:0 18px 40px rgba(15,23,42,0.18);}
+.sidebar-mobile-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;}
+.sidebar h1{font-size:18px;margin:0;padding:0 2px;line-height:1.3;}
+.sidebar-close-btn{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border:none;border-radius:999px;background:#f1f5f9;color:#475569;font-size:16px;cursor:pointer;flex-shrink:0;}
+.sidebar nav button{font-size:15px;padding:12px 14px;}
+.sidebar .chat-btn{font-size:13px;padding:10px 12px;}
+.main-content{padding:16px 12px 24px;}
+.panel{padding:16px;}
+.grid-top{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+.kpi{padding:14px;}
+.dash-two-col,.cal-layout,.company-summary-row{grid-template-columns:1fr;}
+.companies-grid{grid-template-columns:1fr;}
+.company-person-row{grid-template-columns:1fr;}
+.side-list{position:relative;top:auto;max-height:none;}
 .calendar{overflow-x:auto;}
-.cal-grid{min-width:760px;}
-.table-wrap{overflow:auto;}
+.cal-grid{min-width:640px;}
+.ai-week-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+.table-toolbar{flex-direction:column;align-items:stretch;}
+.search-box{width:100%;}
+.chat-drawer{width:min(100vw,420px);}
+.modal-overlay{align-items:flex-start;padding:calc(env(safe-area-inset-top,0px) + 18px) 8px 12px;}
+.modal-box{width:calc(100vw - 16px);max-width:calc(100vw - 16px);max-height:calc(100vh - 28px);padding:48px 14px 16px;}
 .detail-scroll-shell .detail-manager-row,
 .detail-scroll-shell .detail-highlight,
 .detail-scroll-shell .detail-normal-row,
 .detail-scroll-shell .detail-progress-panel,
 .detail-scroll-shell .detail-visit-history,
-.detail-scroll-shell #detail-note-wrap{min-width:720px;}
-.companies-grid{grid-template-columns:1fr;}
-.company-person-row{grid-template-columns:1fr;}
-.company-summary-row{grid-template-columns:1fr;}
-.sidebar{width:56px;padding:10px 4px;}
-.sidebar h1{font-size:11px;text-align:center;}
-.sidebar nav button{font-size:11px;padding:8px 4px;text-align:center;word-break:break-all;}
-.sidebar .chat-btn{font-size:10px;padding:6px 2px;}
-.main-content{padding:12px 10px;}
-.grid-top{grid-template-columns:repeat(2,1fr);}
-.dash-two-col{grid-template-columns:1fr;}
-.cal-layout{grid-template-columns:1fr;}
-.side-list{position:relative;max-height:300px;}
-.detail-manager-row.triple{grid-template-columns:1fr;}
-.detail-highlight{grid-template-columns:1fr;}
-.detail-normal-row{grid-template-columns:1fr;}
-.ai-week-grid{grid-template-columns:repeat(3,1fr);}
-.company-person-row{grid-template-columns:1fr;}
+.detail-scroll-shell #detail-note-wrap{min-width:640px;}
+.detail-manager-row.triple,.detail-highlight,.detail-normal-row{grid-template-columns:1fr;}
 .company-phone-actions{justify-content:flex-start;}
-.table-toolbar{flex-direction:column;align-items:stretch;}
-.search-box{width:100%;}
+.sync-floating-btn{display:none;}
+#notion-linked-banner{top:calc(env(safe-area-inset-top,0px) + 74px) !important;right:12px !important;left:12px !important;text-align:center;font-size:12px;}
 }
-@media (max-width:500px){
-.grid-top{grid-template-columns:1fr 1fr;}
-.ai-week-grid{grid-template-columns:1fr 1fr;}
-.cal-cell{min-height:70px;max-height:140px;font-size:12px;padding:4px;}
+@media (max-width:640px){
+.grid-top{grid-template-columns:1fr;}
+.ai-week-grid{grid-template-columns:1fr;}
+.completion-list{grid-template-columns:1fr;}
+.kpi .value{font-size:22px;}
+.cal-grid{min-width:560px;}
+.cal-cell{min-height:74px;max-height:150px;font-size:12px;padding:4px;}
 .cal-cell .date-num{font-size:13px;}
-.cal-event{font-size:11px;padding:2px 4px;}
+.cal-event{font-size:11px;padding:3px 5px;}
 .holiday-badge{font-size:8px;padding:1px 4px;}
+.chat-drawer{width:100vw;}
+.mobile-topbar-title{font-size:14px;}
+.mobile-menu-btn,.mobile-sync-btn{padding:9px 10px;font-size:12px;}
 }
 </style>
 </head>
 <body>
+<div class="mobile-topbar">
+  <button class="mobile-menu-btn" type="button" onclick="openMobileNav()" aria-label="메뉴 열기">☰ 메뉴</button>
+  <div class="mobile-topbar-title">🦺 안전관리 대시보드</div>
+  <button class="mobile-sync-btn" type="button" onclick="syncFromMobile()">동기화</button>
+</div>
+<div class="mobile-sidebar-backdrop" id="mobile-sidebar-backdrop" onclick="closeMobileNav()"></div>
 <div class="app-layout">
-  <div class="sidebar">
-    <h1>🦺 안전관리 대시보드</h1>
+  <div class="sidebar" id="app-sidebar">
+    <div class="sidebar-mobile-head">
+      <h1>🦺 안전관리 대시보드</h1>
+      <button class="sidebar-close-btn" type="button" onclick="closeMobileNav()" aria-label="메뉴 닫기">✕</button>
+    </div>
     <nav>
       <button class="tab-btn active" data-page="dashboard">대시보드</button>
       <button class="tab-btn" data-page="stats">통계 분석</button>
@@ -562,7 +593,7 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:12px;}
 </div>
 
 <footer>안전관리 통합 대시보드 · Notion 연동</footer>
-<button onclick="syncFromNotion()" style="position:fixed;bottom:16px;left:16px;padding:10px 14px;background:#16a34a;color:white;border:none;border-radius:8px;cursor:pointer;z-index:400;">🔄 Notion 동기화</button>
+<button class="sync-floating-btn" onclick="syncFromNotion()">🔄 Notion 동기화</button>
 
 
 <script>
@@ -627,6 +658,12 @@ const CONTACT_KEY = 'contactScheduleStore';
 const CHAT_KEY = 'modificationChatLog';
 function loadStore(key){ try{ const raw=JSON.parse(localStorage.getItem(key))||{}; const fixed={}; Object.entries(raw).forEach(([k,v])=>{ if(Array.isArray(v)) fixed[k]=v.filter(Boolean); else if(typeof v==='string'&&v) fixed[k]=[v]; else fixed[k]=[]; }); return fixed; }catch(e){return {};} }
 function saveStore(key,data){ localStorage.setItem(key, JSON.stringify(data)); }
+function openMobileNav(){ document.body.classList.add('mobile-nav-open'); document.getElementById('app-sidebar').classList.add('open'); document.getElementById('mobile-sidebar-backdrop').classList.add('active'); }
+function closeMobileNav(){ document.body.classList.remove('mobile-nav-open'); document.getElementById('app-sidebar').classList.remove('open'); document.getElementById('mobile-sidebar-backdrop').classList.remove('active'); }
+function syncFromMobile(){ syncFromNotion(); closeMobileNav(); }
+function handleResponsiveLayout(){ if(window.innerWidth > 1024) closeMobileNav(); }
+window.addEventListener('resize', handleResponsiveLayout);
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeMobileNav(); });
 
 
 let visitStore = loadStore(STORE_KEY);
@@ -668,6 +705,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(btn.dataset.page).classList.add('active');
+    if(window.innerWidth <= 1024) closeMobileNav();
   });
 });
 
