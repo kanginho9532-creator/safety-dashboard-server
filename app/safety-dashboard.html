@@ -566,6 +566,26 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:12px;}
 
 
 <script>
+(function(){
+  // 여러 팝업(회사 상세보기, 공사명 상세보기, 목록 등)이 겹쳐 열릴 때
+  // 순서를 고정하지 않고, 방금 클릭해서 연 팝업이 항상 맨 위로 오도록 처리.
+  let modalZTop = 1000;
+  const modalObserver = new MutationObserver((mutations)=>{
+    mutations.forEach(m=>{
+      if(m.attributeName!=='class') return;
+      const el = m.target;
+      if(el.classList && el.classList.contains('modal-overlay') && el.classList.contains('active')){
+        modalZTop += 10;
+        el.style.zIndex = modalZTop;
+      }
+    });
+  });
+  document.addEventListener('DOMContentLoaded', ()=>{
+    document.querySelectorAll('.modal-overlay').forEach(el=>{
+      modalObserver.observe(el, {attributes:true, attributeFilter:['class']});
+    });
+  });
+})();
 function getHolidayName(year, month, day) {
     const m = month + 1;
     const fixed = {'1-1':'신정','3-1':'삼일절','5-5':'어린이날','6-6':'현충일','8-15':'광복절','10-3':'개천절','10-9':'한글날','12-25':'크리스마스'};
