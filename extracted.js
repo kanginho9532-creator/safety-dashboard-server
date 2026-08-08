@@ -1,482 +1,4 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>안전관리 통합 대시보드</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2563eb">
-<style>
-:root{--blue:#2563eb;--green:#16a34a;--orange:#f59e0b;--red:#ef4444;--purple:#8b5cf6;--gray:#64748b;--bg:#f4f6f9;--card:#ffffff;--border:#e2e8f0;--text:#1e293b;--muted:#64748b;}
-*{box-sizing:border-box;}
-body{margin:0;font-family:'Segoe UI',Malgun Gothic,sans-serif;background:var(--bg);color:var(--text);}
-.app-layout{display:flex;min-height:100vh;}
-.sidebar{width:190px;background:var(--card);border-right:1px solid var(--border);padding:16px 10px;position:sticky;top:0;height:100vh;flex-shrink:0;}
-.sidebar h1{font-size:15px;margin:0 0 18px;padding:0 6px;}
-.sidebar nav{display:flex;flex-direction:column;gap:4px;}
-.sidebar nav button{padding:10px 12px;border:none;background:transparent;border-radius:8px;cursor:pointer;font-size:13.5px;color:var(--muted);text-align:left;}
-.sidebar nav button.active{background:var(--blue);color:white;}
-.sidebar .chat-btn{margin-top:20px;width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:#eff6ff;color:var(--blue);font-weight:600;cursor:pointer;font-size:13px;}
-.main-content{flex:1;padding:20px 24px;min-width:0;}
-.page{display:none;}
-.page.active{display:block;}
-.grid-top{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:16px;}
-.kpi{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;transition:transform .15s,box-shadow .15s;border-left:5px solid var(--border);}
-.kpi:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.08);}
-.kpi .label{font-size:12px;color:var(--muted);}
-.kpi .value{font-size:24px;font-weight:700;margin-top:4px;}
-.kpi-blue{border-left-color:#2563eb;}.kpi-blue .value{color:#2563eb;}
-.kpi-orange{border-left-color:#f59e0b;}.kpi-orange .value{color:#f59e0b;}
-.kpi-red{border-left-color:#64748b;}.kpi-red .value{color:#64748b;}
-.kpi-green{border-left-color:#16a34a;}.kpi-green .value{color:#16a34a;}
-.kpi-purple{border-left-color:#dc2626;background:#fef2f2;}.kpi-purple .value{color:#dc2626;}
-.kpi-box-red{border:2px solid #ef4444;background:#fff5f5;}
-.kpi-box-gray{border:2px solid #94a3b8;background:#f8fafc;}
-.kpi-list-row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;background:#f8fafc;gap:10px;overflow:hidden;}
-.kpi-list-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
-.kpi-list-row:hover{background:#eef2ff;border-color:#c7d2fe;}
-.kpi-list-row span{color:#64748b;font-size:13px;}
-.grid-main{display:flex;flex-direction:column;gap:16px;}
-.panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
-.panel h3{margin:0 0 14px;font-size:16px;}
-.dash-two-col{display:grid;grid-template-columns:1.1fr 0.9fr;gap:16px;margin-bottom:16px;align-items:stretch;}
-.dash-scroll{max-height:420px;overflow-y:auto;margin-bottom:0;}
-.region-activity-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-.region-item,.activity-item{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px dashed var(--border);font-size:14px;gap:10px;overflow:hidden;}
-.region-item span:first-child,.activity-item span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
-.activity-item span:last-child{flex-shrink:0;color:#94a3b8;font-size:12.5px;}
-.activity-item .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;}
-.unvisited-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px dashed var(--border);font-size:14px;gap:10px;overflow:hidden;}
-.unvisited-row>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1;}
-.progress-badge{font-size:12.5px;padding:3px 10px;border-radius:10px;background:#fef3c7;color:#92400e;font-weight:600;white-space:nowrap;}
-.progress-badge.full{background:#dcfce7;color:#166534;}
-.ai-schedule-panel{width:100%;}
-.ai-week-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:10px;}
-.ai-day{overflow:hidden;min-width:0;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;padding:12px;min-height:160px;background:#fafbfc;}
-.ai-day.weekend{background:#f1f5f9;opacity:0.6;}
-.ai-day .d-label{font-size:14px;font-weight:700;color:var(--muted);margin-bottom:8px;}
-.ai-visit-chip{font-size:12px;line-height:1.4;color:#1e293b;background:#fff;border-radius:6px;padding:6px 8px;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;box-sizing:border-box;width:100%;}
-.chip-hyundai{background:#f5f3ff;border:1px solid #ede9fe;}.chip-normal{background:#eff6ff;border:1px solid #dbeafe;}.chip-never{background:#fef2f2;border:1px solid #fee2e2;}
-.completion-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
-.completion-card{border:1px solid var(--border);border-radius:10px;padding:14px;font-size:14px;background:#fff7ed;line-height:1.5;overflow:hidden;}
-.completion-card strong{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;}
-.completion-card .d{color:var(--red);font-weight:700;}
-.table-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
-.page-sticky-toolbar{position:sticky;top:0;z-index:40;background:var(--card);padding:4px 0 10px;margin:-4px 0 12px;border-bottom:1px solid #eef2f7;}
-.search-box{padding:8px 12px;border:1px solid var(--border);border-radius:8px;width:260px;font-size:13px;}
-.table-wrap{overflow:auto;max-height:600px;border:1px solid var(--border);border-radius:8px;}
-table.stat{border-collapse:collapse;width:100%;font-size:13px;}
-table.stat thead th{position:sticky;top:0;background:var(--blue);color:white;padding:10px;z-index:10;border-right:1px solid rgba(255,255,255,0.2);white-space:nowrap;}
-table.stat thead th.sticky-col{left:0;z-index:11;}
-table.stat td{padding:8px 10px;border-bottom:1.5px dashed #cbd5e1;border-right:1.5px dashed #e2e8f0;white-space:nowrap;}
-table.stat th{border-right:1px dashed rgba(255,255,255,0.35);}
-table.stat tbody tr:nth-child(even){background:#f8fafc;}
-.site-link{color:var(--blue);cursor:pointer;font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;}
-.site-tag{display:inline-block;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:4px 10px;border-radius:14px;font-weight:600;font-size:12.5px;cursor:pointer;vertical-align:middle;}
-.site-link:hover{text-decoration:underline;}
-.note-flag{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;background:#facc15;color:#dc2626;font-weight:900;font-size:13px;border-radius:50%;margin-left:6px;cursor:help;box-shadow:0 0 0 2px rgba(250,204,21,0.35);vertical-align:middle;}
-.cal-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:14px;align-items:start;}
-.side-list{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;max-height:78vh;overflow-y:auto;position:sticky;top:0;}
-.side-list h4{font-size:13px;margin:10px 0 6px;color:var(--muted);}
-.drag-card{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:12.5px;cursor:grab;user-select:none;display:flex;align-items:center;justify-content:space-between;overflow:hidden;}
-.drag-card-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
-.drag-card.never{background:#fef2f2;border-color:#fecaca;}
-.drag-card:active{cursor:grabbing;opacity:0.6;}
-.drag-over{background:#dbeafe !important;}
-.calendar{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;overflow:hidden;min-width:0;}
-.cal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
-.cal-hint{font-size:11.5px;color:var(--muted);margin-bottom:8px;}
-.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;padding:8px;border:1.5px solid #cbd5e1;border-radius:10px;background:#f1f5f9;box-sizing:border-box;width:100%;table-layout:fixed;overflow:hidden;}
-.cal-cell{min-height:100px;max-height:220px;border:1.5px solid #cbd5e1;border-radius:8px;padding:6px;font-size:14px;position:relative;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,0.03);min-width:0;overflow-y:auto;overflow-x:hidden;box-sizing:border-box;}
-.cal-cell.drag-over{background:#dbeafe;border-color:var(--blue);}
-.cal-cell.cal-today{background:#fffbea;border:2px solid #f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,0.15);}
-.cal-cell.cal-focused{outline:2px solid #16a34a;}
-.cal-cell .date-num{font-weight:700;font-size:16px;}
-.cal-cell.cal-holiday{background:#fff5f5;border-color:#fecaca;}
-.cal-cell.cal-holiday .date-num{color:#dc2626 !important;}
-.holiday-badge{display:inline-block;background:#fef2f2;color:#dc2626;font-size:10px;font-weight:800;padding:1px 6px;border-radius:4px;border:1.5px solid #fecaca;margin-top:2px;letter-spacing:0.3px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;}
-.today-badge{background:#f59e0b;color:white;font-size:11px;font-weight:700;padding:2px 6px;border-radius:8px;margin-left:4px;vertical-align:middle;}
-.cal-event{background:var(--blue);color:white;border-radius:5px;padding:4px 6px;font-size:13px;font-weight:700;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:grab;user-select:none;max-width:100%;box-sizing:border-box;display:block;}
-.cal-event.contact{background:var(--orange);}
-.cal-event.selected{outline:2px solid #facc15;box-shadow:0 0 0 2px #facc15;}
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;align-items:center;justify-content:center;}
-.modal-overlay.active{display:flex;}
-.modal-box{background:var(--card);border-radius:14px;padding:28px;width:760px;max-width:95vw;max-height:88vh;overflow-y:auto;position:relative;}
-.detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;position:sticky;top:-28px;z-index:5;margin:-28px -28px 14px;padding:18px 28px 12px;background:rgba(255,255,255,0.98);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);}
-.detail-header h3{margin:0;flex:1;min-width:0;font-size:20px;line-height:1.45;word-break:keep-all;}
-.modal-close{position:absolute;top:14px;right:16px;cursor:pointer;font-size:18px;color:var(--muted);background:none;border:none;}
-.modal-close.inline-close{position:static;display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:42px;border:1px solid var(--border);border-radius:12px;background:#fff;color:#475569;font-size:18px;box-shadow:0 2px 8px rgba(15,23,42,0.06);flex-shrink:0;}
-.modal-close.inline-close:hover{background:#f8fafc;}
-.detail-highlight{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;margin-top:6px;padding:4px;border:1px solid var(--border);border-radius:12px;}
-.detail-box{border-radius:8px;padding:10px 12px;color:white;}
-.detail-box.contact{background:linear-gradient(135deg,#f59e0b,#f97316);}
-.detail-box.visit{background:linear-gradient(135deg,#2563eb,#3b82f6);}
-.detail-box .lbl{font-size:13px;opacity:0.9;}
-.detail-box .val{font-size:17px;font-weight:700;margin-top:4px;}
-.detail-normal-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;font-size:15px;}
-.detail-normal-row .item{background:#f8fafc;border:1.5px solid var(--border);border-radius:8px;padding:12px 14px;}
-.detail-normal-row .item .lbl{font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:600;}
-.detail-note{background:#fef2f2;border:2px solid #ef4444;border-radius:10px;padding:14px 16px;font-size:14px;color:#991b1b;margin:12px 0;font-weight:600;line-height:1.5;}
-.detail-manager-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;padding:4px;border:1px solid var(--border);border-radius:12px;}
-.detail-manager-row.triple{grid-template-columns:1fr 1fr 1fr;}
-.mgr-item{background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;overflow:hidden;}
-.mgr-item .lbl{color:#4338ca;font-weight:700;font-size:14px;white-space:nowrap;}
-.mgr-item .val{font-weight:700;color:#1e1b4b;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
-.detail-progress-panel{background:#f8fafc;border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;}
-.detail-progress-panel .lbl{font-size:15px;font-weight:700;color:var(--muted);margin-bottom:8px;}
-.progress-boxes{display:flex;gap:6px;flex-wrap:wrap;}
-.progress-box{width:26px;height:26px;border-radius:5px;background:#e2e8f0;border:1px solid #cbd5e1;}
-.progress-box.filled{background:linear-gradient(135deg,#22c55e,#16a34a);border-color:#16a34a;}
-.detail-visit-history{background:#f8fafc;border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;}
-.detail-visit-history .lbl{font-size:15px;font-weight:700;color:var(--muted);margin-bottom:8px;}
-.visit-history-list{display:flex;gap:6px;flex-wrap:wrap;}
-.visit-history-chip{background:#dbeafe;color:#1d4ed8;font-size:14px;font-weight:700;padding:8px 14px;border-radius:8px;border:1.5px solid #93c5fd;display:inline-block;}
-.chat-drawer{position:fixed;right:0;top:0;height:100vh;width:340px;background:var(--card);border-left:1px solid var(--border);transform:translateX(100%);transition:transform 0.25s;z-index:300;display:flex;flex-direction:column;}
-.chat-drawer.open{transform:translateX(0);}
-.chat-header{padding:14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
-.chat-log{flex:1;overflow-y:auto;padding:12px;font-size:13px;}
-.chat-msg{background:#f1f5f9;border-radius:8px;padding:8px 10px;margin-bottom:8px;}
-.chat-input-row{display:flex;gap:6px;padding:10px;border-top:1px solid var(--border);}
-.chat-input-row input{flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px;}
-.chat-input-row button{padding:8px 12px;background:var(--blue);color:white;border:none;border-radius:6px;cursor:pointer;}
-footer{text-align:center;padding:20px;color:var(--muted);font-size:12px;}
-.copy-btn{cursor:pointer;margin-left:8px;font-size:18px;padding:2px 4px;}
-.mobile-topbar,.mobile-nav-backdrop,.mobile-card-list,.mobile-agenda{display:none;}
-.mobile-data-card{display:flex;flex-direction:column;gap:10px;width:100%;border:1px solid var(--border);border-radius:14px;background:var(--card);padding:14px 14px 12px;box-shadow:0 6px 18px rgba(15,23,42,0.05);text-align:left;cursor:pointer;}
-.mobile-data-card.compact{padding:12px 14px;}
-.mobile-data-card.compact .mobile-card-title{align-items:center;}
-.mobile-data-card + .mobile-data-card{margin-top:12px;}
-.mobile-card-title{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
-.mobile-card-title strong{font-size:14px;line-height:1.45;}
-.mobile-card-company{font-size:12px;color:var(--muted);margin-top:4px;}
-.mobile-meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
-.contracts-meta-scroll{display:grid;}
-.mobile-meta-item{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:9px 10px;}
-.mobile-meta-item .lbl{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;}
-.mobile-meta-item .val{display:block;font-size:12.5px;font-weight:700;color:var(--text);line-height:1.4;}
-.mobile-month-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
-.mobile-month-chip{background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:8px 6px;text-align:center;}
-.mobile-month-chip .m{display:block;font-size:11px;color:#4338ca;}
-.mobile-month-chip .v{display:block;font-size:14px;font-weight:800;color:#1d4ed8;margin-top:2px;}
-.mobile-empty{padding:16px 12px;color:#94a3b8;font-size:13px;text-align:center;background:#f8fafc;border:1px dashed var(--border);border-radius:12px;}
-.mobile-agenda{margin-top:12px;}
-.mobile-agenda-day + .mobile-agenda-day{margin-top:12px;}
-.mobile-agenda-date{font-size:13px;font-weight:700;color:#334155;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
-.mobile-agenda-card{background:#fff;border:1px solid var(--border);border-left:4px solid var(--blue);border-radius:12px;padding:12px 12px 10px;box-shadow:0 4px 12px rgba(15,23,42,0.04);cursor:pointer;}
-.mobile-agenda-card + .mobile-agenda-card{margin-top:8px;}
-.mobile-agenda-card.contact{border-left-color:var(--orange);}
-.mobile-agenda-card .title{font-size:14px;font-weight:700;line-height:1.4;}
-.mobile-agenda-card .sub{font-size:12px;color:var(--muted);margin-top:4px;}
-.mobile-agenda-card .tag{display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700;margin-top:8px;background:#eff6ff;color:#1d4ed8;}
-.mobile-agenda-card.contact .tag{background:#fff7ed;color:#c2410c;}
-.calendar-picker-subtitle{font-size:13px;color:var(--muted);margin:-2px 0 12px;}
-.calendar-picker-list{display:flex;flex-direction:column;gap:10px;}
-.calendar-picker-item{width:100%;border:1px solid var(--border);border-radius:12px;background:#fff;padding:12px 14px;text-align:left;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 4px 12px rgba(15,23,42,0.04);}
-.calendar-picker-item .name{font-size:14px;font-weight:700;color:var(--text);line-height:1.45;}
-.calendar-picker-item .sub{font-size:12px;color:var(--muted);margin-top:4px;}
-.calendar-picker-item .state{flex-shrink:0;font-size:11px;font-weight:700;padding:5px 8px;border-radius:999px;background:#eff6ff;color:#1d4ed8;}
-.calendar-picker-item.is-added{background:#f8fafc;border-color:#cbd5e1;}
-.calendar-picker-item.is-added .state{background:#dcfce7;color:#166534;}
-.floating-sync-btn{position:fixed;bottom:16px;left:16px;padding:10px 14px;background:#16a34a;color:white;border:none;border-radius:8px;cursor:pointer;z-index:400;}
-@media (max-width:900px){
-  body.nav-open{overflow:hidden;}
-  .mobile-topbar{display:flex;position:sticky;top:0;z-index:420;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:rgba(255,255,255,0.96);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);}
-  .mobile-topbar-title{font-size:14px;font-weight:800;min-width:0;flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .mobile-menu-btn,.mobile-topbar-btn{border:none;border-radius:10px;padding:9px 12px;background:#eff6ff;color:var(--blue);font-weight:700;cursor:pointer;flex-shrink:0;}
-  .mobile-menu-btn{font-size:18px;line-height:1;}
-  .mobile-nav-backdrop.open{display:block;position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:409;}
-  .app-layout{display:block;min-height:auto;}
-  .sidebar{position:fixed;left:0;top:0;bottom:0;width:min(82vw,320px);height:100vh;transform:translateX(-108%);transition:transform .24s ease;z-index:410;padding:16px 12px 20px;overflow-y:auto;box-shadow:18px 0 42px rgba(15,23,42,0.18);}
-  .sidebar.mobile-open{transform:translateX(0);}
-  .sidebar h1{font-size:16px;margin-bottom:16px;padding:0 4px;}
-  .sidebar nav{gap:8px;}
-  .sidebar nav button{font-size:14px;padding:12px 14px;border:1px solid transparent;}
-  .sidebar .chat-btn{margin-top:12px;font-size:13px;padding:11px 12px;}
-  .main-content{padding:14px 12px 18px;}
-  .panel{padding:16px;}
-  .page-sticky-toolbar{top:56px;padding-top:8px;margin-top:-8px;}
-  .contracts-meta-scroll{display:flex;overflow-x:auto;gap:8px;padding-bottom:4px;scrollbar-width:thin;}
-  .contracts-meta-scroll .mobile-meta-item{flex:0 0 138px;min-width:138px;}
-  #calendar .side-list,#contact-calendar .side-list,#calendar .mobile-agenda,#contact-calendar .mobile-agenda{display:none;}
-  .detail-header{top:-20px;margin:-20px -16px 14px;padding:14px 16px 12px;}
-  .detail-header h3{font-size:18px;}
-  .detail-progress-panel .progress-boxes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
-  .detail-progress-panel .progress-box{width:100%;height:34px;border-radius:10px;}
-  .dash-scroll{max-height:none;}
-  .table-wrap{display:none;}
-  .mobile-card-list,.mobile-agenda{display:block;}
-  .calendar{overflow-x:auto;padding:10px;}
-  .cal-grid{min-width:760px;}
-  .side-list{position:relative;top:auto;max-height:none;}
-  .modal-box{width:min(96vw,760px);max-height:92vh;padding:20px 16px 18px;}
-  .chat-drawer{width:min(92vw,360px);}
-  .floating-sync-btn{display:none;}
-}
-@media (max-width:800px){
-.sidebar{width:56px;padding:10px 4px;}
-.sidebar h1{font-size:11px;text-align:center;}
-.sidebar nav button{font-size:11px;padding:8px 4px;text-align:center;word-break:break-all;}
-.sidebar .chat-btn{font-size:10px;padding:6px 2px;}
-.main-content{padding:12px 10px;}
-.grid-top{grid-template-columns:repeat(2,1fr);}
-.dash-two-col{grid-template-columns:1fr;}
-.cal-layout{grid-template-columns:1fr;}
-.side-list{position:relative;max-height:300px;}
-.detail-manager-row.triple{grid-template-columns:1fr;}
-.detail-highlight{grid-template-columns:1fr;}
-.detail-normal-row{grid-template-columns:1fr;}
-.ai-week-grid{grid-template-columns:repeat(3,1fr);}
-.table-toolbar{flex-direction:column;align-items:stretch;}
-.search-box{width:100%;}
-}
-@media (max-width:500px){
-.grid-top{grid-template-columns:1fr 1fr;}
-.ai-week-grid{grid-template-columns:1fr 1fr;}
-.cal-cell{min-height:70px;max-height:140px;font-size:12px;padding:4px;}
-.cal-cell .date-num{font-size:13px;}
-.cal-event{font-size:11px;padding:2px 4px;}
-.holiday-badge{font-size:8px;padding:1px 4px;}
-}
-</style>
-</head>
-<body>
-<div class="mobile-topbar">
-  <button class="mobile-menu-btn" onclick="toggleMobileNav(true)" aria-label="메뉴 열기">☰</button>
-  <div class="mobile-topbar-title">🦺 안전관리 대시보드</div>
-  <button class="mobile-topbar-btn" onclick="syncFromNotion()">동기화</button>
-</div>
-<div class="mobile-nav-backdrop" onclick="toggleMobileNav(false)"></div>
-<div class="app-layout">
-  <div class="sidebar" id="sidebar">
-    <h1>🦺 안전관리 대시보드</h1>
-    <nav>
-      <button class="tab-btn active" data-page="dashboard">대시보드</button>
-      <button class="tab-btn" data-page="stats">통계 분석</button>
-      <button class="tab-btn" data-page="contracts">계약관리</button>
-      <button class="tab-btn" data-page="calendar">일정 캘린더</button>
-      <button class="tab-btn" data-page="contact-calendar">연락요청 캘린더</button>
-    </nav>
-    <button class="chat-btn" onclick="toggleChat()">💬 수정요청 챗</button>
-    <button class="chat-btn" id="ai-voice-btn" onclick="toggleVoiceAssistant()" style="margin-top:8px;background:#f0fdf4;color:#16a34a;">🎙 AI 음성지시</button>
-  </div>
 
-  <div class="main-content">
-    <div class="page active" id="dashboard">
-      <div class="grid-top">
-        <div class="kpi kpi-blue" onclick="openKpiList('total')"><div class="label">전체 현장</div><div class="value" id="kpi-total">-</div></div>
-        <div class="kpi kpi-orange" onclick="openKpiList('unvisited')"><div class="label">이번달 미방문</div><div class="value" id="kpi-unvisited">-</div></div>
-        <div class="kpi kpi-red" onclick="openKpiList('never')"><div class="label">1회도 방문없음</div><div class="value" id="kpi-never">-</div></div>
-        <div class="kpi kpi-green" onclick="openKpiList('monthly-visits')"><div class="label">이번달 총 방문횟수</div><div class="value" id="kpi-monthly-visits">-</div></div>
-        <div class="kpi kpi-purple" onclick="openKpiList('completion')"><div class="label">준공 임박(30일)</div><div class="value" id="kpi-completion">-</div></div>
-      </div>
-      <div class="dash-two-col">
-        <div class="panel dash-scroll">
-          <h3>준공 임박 현장 (30일 이내)</h3>
-          <div class="completion-list" id="completion-list"></div>
-          <h3 style="margin-top:16px;">사이트 현황</h3>
-          <div id="region-list"></div>
-        </div>
-        <div class="panel dash-scroll">
-          <h3>최근 활동</h3>
-          <div id="activity-list"></div>
-        </div>
-      </div>
-      <div class="panel ai-schedule-panel">
-        <h3>🤖 AI 이번주 주중 방문 스케줄 분석</h3>
-        <div class="cal-hint">월 2회 방문 기준·미방문 현장 우선·하루 최대 4곳(현대제철 최대 3곳, 겹치면 총 4곳)·주말 제외. 확인 후 캘린더에 직접 반영하세요.</div>
-        <div class="ai-week-grid" id="ai-week-grid"></div>
-      </div>
-    </div>
-
-    <div class="page" id="stats">
-      <div class="panel">
-        <div class="table-toolbar page-sticky-toolbar">
-          <h3 style="margin:0;">통계 분석 - 월별 방문 현황 (헤더 틀고정)</h3>
-          <input class="search-box" id="stats-search" placeholder="공사명/회사명 검색" onkeyup="renderStatsTable()">
-          <select id="stats-sort" onchange="sortMode=this.value; renderStatsTable();" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;margin-left:8px;">
-            <option value="lastEdited">최종 업데이트 순</option>
-            <option value="note">비고(!) 있는 순</option>
-            <option value="completion">준공일 임박 순</option>
-            <option value="never">1회도 방문없음 순</option>
-            <option value="priority">우선순위(비고→준공→미방문)</option>
-            <option value="name">공사명 가나다순</option>
-          </select>
-        </div>
-        <div class="table-wrap">
-          <table class="stat" id="stat-table">
-            <thead><tr><th class="sticky-col">공사명</th><th class="sticky-col">회사명</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th></tr></thead>
-            <tbody id="stat-tbody"></tbody>
-          </table>
-        </div>
-        <div class="mobile-card-list" id="stats-mobile-list"></div>
-      </div>
-    </div>
-
-    <div class="page" id="contracts">
-      <div class="panel">
-        <div class="table-toolbar page-sticky-toolbar">
-          <h3 style="margin:0;">계약관리 (Notion 최근 수정일 기준 내림차순)</h3>
-          <input class="search-box" id="contracts-search" placeholder="공사명/회사명 검색" onkeyup="renderContractsTable()">
-          <select id="contracts-sort" onchange="sortMode=this.value; renderContractsTable();" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;margin-left:8px;">
-            <option value="lastEdited">최종 업데이트 순</option>
-            <option value="note">비고(!) 있는 순</option>
-            <option value="completion">준공일 임박 순</option>
-            <option value="never">1회도 방문없음 순</option>
-            <option value="priority">우선순위(비고→준공→미방문)</option>
-            <option value="name">공사명 가나다순</option>
-          </select>
-        </div>
-        <div class="table-wrap">
-          <table class="stat" id="contract-table">
-            <thead><tr><th>NO</th><th>공사명</th><th>회사명</th><th>계약일</th><th>착공일</th><th>준공일</th><th>계약금액</th><th>최근 수정일</th><th>상태</th></tr></thead>
-            <tbody id="contract-tbody"></tbody>
-          </table>
-        </div>
-        <div class="mobile-card-list" id="contracts-mobile-list"></div>
-      </div>
-    </div>
-
-    <div class="page" id="calendar">
-      <div class="cal-layout">
-        <div class="side-list">
-          <input type="text" id="cal-site-search" placeholder="🔍 공사명 검색" style="width:100%;box-sizing:border-box;padding:8px 10px;margin-bottom:10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;" oninput="filterCalSiteList()">
-          <div id="unvisited-cards"></div>
-          <h4>1회도 방문하지 않은 현장</h4>
-          <div id="never-cards"></div>
-        </div>
-        <div class="calendar">
-          <div class="cal-header">
-            <button onclick="changeMonth(-1)">◀</button>
-            <strong id="cal-month-label"></strong>
-            <button onclick="changeMonth(1)">▶</button>
-          </div>
-          <div class="cal-hint">클릭: 선택/포커스 · Ctrl+클릭: 다중 선택 · 드래그: 이동 · Ctrl+드래그: 복사 · Ctrl+C/V: 복사·붙여넣기 · Esc/빈공간 클릭: 전체 선택 해제</div>
-          <div class="cal-grid" id="cal-grid"></div>
-          <div class="mobile-agenda" id="visit-mobile-agenda"></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="page" id="contact-calendar">
-      <div class="cal-layout">
-        <div class="side-list">
-          <input type="text" id="cal-site-search-2" placeholder="🔍 공사명 검색" style="width:100%;box-sizing:border-box;padding:8px 10px;margin-bottom:10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;" oninput="filterCalSiteList2()">
-          <h4>이번달 미방문 현장</h4>
-          <div id="unvisited-cards-2"></div>
-          <h4>1회도 방문하지 않은 현장</h4>
-          <div id="never-cards-2"></div>
-        </div>
-        <div class="calendar">
-          <div class="cal-header">
-            <button onclick="changeMonthContact(-1)">◀</button>
-            <strong id="cal-month-label-contact"></strong>
-            <button onclick="changeMonthContact(1)">▶</button>
-          </div>
-          <div class="cal-hint">클릭: 선택/포커스 · Ctrl+클릭: 다중 선택 · 드래그: 이동 · Ctrl+드래그: 복사 · Ctrl+C/V: 복사·붙여넣기 · Esc/빈공간 클릭: 전체 선택 해제</div>
-          <div class="cal-grid" id="cal-grid-contact"></div>
-          <div class="mobile-agenda" id="contact-mobile-agenda"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="detail-modal" onclick="if(event.target===this) closeDetail()">
-  <div class="modal-box">
-    <div class="detail-header">
-      <h3 id="detail-title">-</h3>
-      <button class="modal-close inline-close" onclick="closeDetail()" aria-label="상세보기 닫기">✕</button>
-    </div>
-    <div class="detail-manager-row triple">
-      <div class="mgr-item"><span class="lbl">🏢 회사명</span><span class="val" id="detail-manager-company">-</span></div>
-      <div class="mgr-item"><span class="lbl">👤 담당자</span><span class="val" id="detail-manager-name">-</span></div>
-      <div class="mgr-item"><span class="lbl">📱 연락처</span><span class="val" id="detail-manager-contact">-</span></div>
-    </div>
-    <div class="detail-highlight">
-      <div class="detail-box contact"><div class="lbl">📞 연락요청일자</div><div class="val" id="detail-contact-date">-</div></div>
-      <div class="detail-box visit"><div class="lbl">🏗 방문일자</div><div class="val" id="detail-visit-date">-</div></div>
-    </div>
-    <div id="detail-note-wrap"></div>
-    <div class="detail-progress-panel">
-      <div class="lbl">진행횟수 / 총 횟수 <span id="detail-progress-text"></span></div>
-      <div id="detail-progress-boxes" class="progress-boxes"></div>
-    </div>
-    <div class="detail-visit-history">
-      <div class="lbl" id="detail-visit-history-title">방문이력 (총 0회)</div>
-      <div id="detail-visit-history-list" class="visit-history-list"></div>
-    </div>
-    <div class="detail-normal-row">
-      <div class="item"><div class="lbl">계약일</div><div id="detail-contract-date">-</div></div>
-      <div class="item"><div class="lbl">착공일</div><div id="detail-start-date">-</div></div>
-    </div>
-    <div class="detail-normal-row">
-      <div class="item"><div class="lbl">준공일</div><div id="detail-end-date">-</div></div>
-      <div class="item"><div class="lbl">기술지도 계약금액(VAT포함)</div><div id="detail-amount">-</div></div>
-    </div>
-    <div class="detail-normal-row">
-      <div class="item"><div class="lbl">사이트</div><div id="detail-site">-</div></div>
-      <div class="item"><div class="lbl">관리번호</div><div id="detail-mgmt-no">-</div></div>
-    </div>
-    <div class="detail-normal-row">
-      <div class="item"><div class="lbl">사업장개시번호</div><div id="detail-biz-open-no">-</div></div>
-      <div class="item"><div class="lbl">사업장관리번호</div><div id="detail-biz-mgmt-no">-</div></div>
-    </div>
-    <div id="detail-company" style="display:none;"></div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="calendar-picker-modal" onclick="if(event.target===this) closeCalendarPicker()">
-  <div class="modal-box" style="width:520px;">
-    <div class="detail-header">
-      <div>
-        <h3 id="calendar-picker-title">일정 추가</h3>
-        <div class="calendar-picker-subtitle" id="calendar-picker-date">-</div>
-      </div>
-      <button class="modal-close inline-close" onclick="closeCalendarPicker()" aria-label="일정 추가 닫기">✕</button>
-    </div>
-    <input type="text" id="calendar-picker-search" class="search-box" style="width:100%;margin-bottom:12px;" placeholder="공사명/회사명 검색" oninput="renderCalendarPickerList()">
-    <div class="calendar-picker-list" id="calendar-picker-list"></div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="kpi-list-modal" onclick="if(event.target===this) closeKpiList()">
-  <div class="modal-box" id="kpi-list-box" style="width:520px;">
-    <button class="modal-close" onclick="closeKpiList()">✕</button>
-    <h3 id="kpi-list-title">-</h3>
-    <input type="text" id="kpi-list-search" placeholder="🔍 공사명/회사명 검색" style="width:100%;box-sizing:border-box;padding:9px 12px;margin-top:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;" oninput="filterKpiList()">
-    <div id="kpi-list-body" style="margin-top:12px;max-height:55vh;overflow-y:auto;"></div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="voice-modal" onclick="if(event.target===this) closeVoiceAssistant()">
-  <div class="modal-box" style="width:480px;text-align:center;">
-    <button class="modal-close" onclick="closeVoiceAssistant()">✕</button>
-    <h3>🎙 AI 음성지시</h3>
-    <div id="voice-status" style="margin:16px 0;color:var(--muted);font-size:14px;">버튼을 누르고 말씀해주세요.</div>
-    <div id="voice-transcript" style="min-height:50px;background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px;font-size:15px;margin-bottom:14px;color:#1e293b;"></div>
-    <button id="voice-mic-btn" onclick="startVoiceRecognition()" style="width:72px;height:72px;border-radius:50%;background:#16a34a;color:white;font-size:28px;border:none;cursor:pointer;">🎤</button>
-    <div style="margin-top:10px;font-size:12px;color:var(--muted);">예: "당진 소결 현장 내일 방문 추가해줘", "OO현장 연락요청 삭제해줘"</div>
-    <div id="voice-confirm-box" style="display:none;margin-top:16px;padding:14px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;">
-      <div id="voice-confirm-text" style="font-size:15px;font-weight:600;color:#1e3a8a;margin-bottom:12px;"></div>
-      <button onclick="confirmVoiceAction(true)" style="padding:8px 18px;background:#16a34a;color:white;border:none;border-radius:8px;cursor:pointer;margin-right:8px;font-weight:600;">✅ 예, 실행</button>
-      <button onclick="confirmVoiceAction(false)" style="padding:8px 18px;background:#ef4444;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;">✕ 취소</button>
-    </div>
-  </div>
-</div>
-
-<div class="chat-drawer" id="chat-drawer">
-  <div class="chat-header"><strong>수정요청 챗</strong><button onclick="toggleChat()" style="border:none;background:none;font-size:16px;cursor:pointer;">✕</button></div>
-  <div class="chat-log" id="chat-log"></div>
-  <div class="chat-input-row">
-    <input id="chat-input" placeholder="수정하고 싶은 내용을 입력..." onkeydown="if(event.key==='Enter')sendChat()">
-    <button onclick="sendChat()">전송</button>
-  </div>
-</div>
-
-<footer>안전관리 통합 대시보드 · Notion/DeepSeek 연동은 보안상 백엔드 서버 구성 후 활성화 필요 (README 참고)</footer>
-<button id="desktop-sync-btn" class="floating-sync-btn" onclick="syncFromNotion()">🔄 Notion 동기화</button>
-
-<script>
 function getHolidayName(year, month, day) {
     const m = month + 1;
     const fixed = {'1-1':'신정','3-1':'삼일절','5-5':'어린이날','6-6':'현충일','8-15':'광복절','10-3':'개천절','10-9':'한글날','12-25':'크리스마스'};
@@ -610,15 +132,24 @@ function renderStatsMobileCards(list){
   if(!list.length){ wrap.innerHTML='<div class="mobile-empty">검색 결과가 없습니다.</div>'; return; }
   list.forEach(s=>{
     const noteHtml=s.note?'<span class="note-flag" title="'+escapeHtml(s.note)+'">!</span>':'';
+    let months='';
+    for(let m=1;m<=12;m++){
+      const cnt=(visitStore[s.name]||[]).filter(d=>new Date(d).getMonth()+1===m).length;
+      months += '<div class="mobile-month-chip"><span class="m">'+m+'월</span><span class="v">'+(cnt||0)+'</span></div>';
+    }
     const card=document.createElement('button');
     card.type='button';
-    card.className='mobile-data-card compact';
+    card.className='mobile-data-card';
     card.onclick=()=>openDetailByName(s.name);
     card.innerHTML=`
       <div class="mobile-card-title">
-        <div><strong>${escapeHtml(s.name)}</strong>${noteHtml}</div>
+        <div>
+          <strong>${escapeHtml(s.name)}</strong>${noteHtml}
+          <div class="mobile-card-company">${escapeHtml(s.company||'-')}</div>
+        </div>
         <span class="progress-badge ${countThisMonth(visitStore[s.name])>=MONTHLY_TARGET?'full':''}">${countThisMonth(visitStore[s.name])}/${MONTHLY_TARGET} 방문</span>
-      </div>`;
+      </div>
+      <div class="mobile-month-grid">${months}</div>`;
     wrap.appendChild(card);
   });
 }
@@ -642,7 +173,7 @@ function renderContractsMobileCards(sorted){
         </div>
         <span class="site-tag" style="background:${hexToRgba(siteColor(s.name),0.12)};color:${siteColor(s.name)};">${escapeHtml(s.status||'상태없음')}</span>
       </div>
-      <div class="mobile-meta-grid contracts-meta-scroll">
+      <div class="mobile-meta-grid">
         <div class="mobile-meta-item"><span class="lbl">계약일</span><span class="val">${escapeHtml(fmtDateDot(s.contractDate))}</span></div>
         <div class="mobile-meta-item"><span class="lbl">착공일</span><span class="val">${escapeHtml(fmtDateDot(s.start))}</span></div>
         <div class="mobile-meta-item"><span class="lbl">준공일</span><span class="val">${escapeHtml(fmtDateDot(s.end))}</span></div>
@@ -697,7 +228,6 @@ function renderMobileAgenda(containerId,state,store,eventClass,label){
     wrap.appendChild(dayWrap);
   });
 }
-document.getElementById('calendar-picker-search').addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeCalendarPicker(); } });
 function renderStatsTable(){
   const q=(document.getElementById('stats-search').value||'').toLowerCase();
   const filtered=applySortMode(sites.filter(s=>s.name.toLowerCase().includes(q)||s.company.toLowerCase().includes(q)));
@@ -734,64 +264,6 @@ let selectedEvents = [];
 let clipboardEvents = [];
 let lastFocusedCellDate = null;
 let lastFocusedGridId = null;
-let calendarPickerState = {storeType:'visit', date:''};
-function getCalendarStoreByType(storeType){ return storeType==='visit' ? visitStore : contactStore; }
-function openCalendarPicker(dateStr, storeType){
-  calendarPickerState = {storeType, date:dateStr};
-  document.getElementById('calendar-picker-title').textContent = storeType==='visit' ? '방문 일정 추가' : '연락 요청 추가';
-  document.getElementById('calendar-picker-date').textContent = fmtDateDot(dateStr)+' · 공사명을 선택하면 바로 등록됩니다.';
-  const input=document.getElementById('calendar-picker-search');
-  input.value='';
-  document.getElementById('calendar-picker-modal').classList.add('active');
-  renderCalendarPickerList();
-  setTimeout(()=>input.focus(), 30);
-}
-function closeCalendarPicker(){ document.getElementById('calendar-picker-modal').classList.remove('active'); }
-function renderCalendarPickerList(){
-  const wrap=document.getElementById('calendar-picker-list');
-  if(!wrap) return;
-  const q=(document.getElementById('calendar-picker-search').value||'').trim().toLowerCase();
-  const store=getCalendarStoreByType(calendarPickerState.storeType);
-  const dateStr=calendarPickerState.date;
-  const filtered=applySortMode(sites.filter(s=>{
-    const name=(s.name||'').toLowerCase();
-    const company=(s.company||'').toLowerCase();
-    return !q || name.includes(q) || company.includes(q);
-  }));
-  if(!filtered.length){
-    wrap.innerHTML='<div class="mobile-empty">검색 결과가 없습니다.</div>';
-    return;
-  }
-  wrap.innerHTML=filtered.map(s=>{
-    const already=(store[s.name]||[]).includes(dateStr);
-    return `<button type="button" class="calendar-picker-item ${already?'is-added':''}" data-site-name="${escapeHtml(s.name)}">
-      <div>
-        <div class="name">${escapeHtml(s.name)}</div>
-        <div class="sub">${escapeHtml(s.company||'-')} · ${escapeHtml(s.site||s.region||'-')}</div>
-      </div>
-      <span class="state">${already?'등록됨':'추가'}</span>
-    </button>`;
-  }).join('');
-  wrap.querySelectorAll('.calendar-picker-item').forEach(btn=>{
-    btn.addEventListener('click',()=>addCalendarPickerSite(btn.dataset.siteName));
-  });
-}
-async function addCalendarPickerSite(siteName){
-  const {storeType, date} = calendarPickerState;
-  const store=getCalendarStoreByType(storeType);
-  store[siteName]=store[siteName]||[];
-  if(!(store[siteName]||[]).includes(date)){
-    store[siteName].push(date);
-    saveStore(storeType==='visit'?STORE_KEY:CONTACT_KEY, store);
-    refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
-    closeCalendarPicker();
-    showSyncBanner('✅ '+siteName+' 일정이 추가되었습니다.','#16a34a');
-    await syncAddDate(storeType, siteName, date);
-  } else {
-    closeCalendarPicker();
-    showSyncBanner('이미 등록된 일정입니다.','#2563eb');
-  }
-}
 function eventKey(store,site,date){ return store+'|'+site+'|'+date; }
 
 function renderSideCards(containerIdUnvisited, containerIdNever, storeType){
@@ -890,9 +362,6 @@ function renderCalendarGrid(gridId,labelId,state,store,eventClass,storeKeyName){
       lastFocusedCellDate=dateStr;
       lastFocusedGridId=gridId;
       refreshCalendars();
-      if(isMobileView() && !e.target.closest('.cal-event')){
-        openCalendarPicker(dateStr, storeKeyName);
-      }
     });
     cell.addEventListener('dragover',e=>{ e.preventDefault(); cell.classList.add('drag-over'); });
     cell.addEventListener('dragleave',()=>cell.classList.remove('drag-over'));
@@ -1095,7 +564,7 @@ function openDetailByName(name){ const s=sites.find(x=>x.name===name); if(!s) re
 function closeDetail(){ document.getElementById('detail-modal').classList.remove('active'); }
 function copyToClipboard(text,btn){ navigator.clipboard.writeText(text).then(()=>{ if(btn){ const orig=btn.textContent; btn.textContent='✅'; setTimeout(()=>btn.textContent=orig,1200); } }).catch(()=>{}); }
 function attachCopyButtons(){ document.querySelectorAll('#detail-modal .copy-btn').forEach(b=>b.remove()); const targets=['detail-manager-company','detail-manager-name','detail-manager-contact','detail-contact-date','detail-visit-date','detail-contract-date','detail-start-date','detail-end-date','detail-amount','detail-site','detail-mgmt-no','detail-biz-open-no','detail-biz-mgmt-no']; targets.forEach(id=>{ const el=document.getElementById(id); if(!el) return; const btn=document.createElement('span'); btn.className='copy-btn'; btn.textContent='📋'; btn.title='복사'; btn.style.cssText='cursor:pointer;margin-left:8px;font-size:18px;padding:2px 4px;'; btn.onclick=(e)=>{ e.stopPropagation(); copyToClipboard(el.textContent.trim(),btn); }; el.appendChild(btn); }); const titleEl=document.getElementById('detail-title'); if(titleEl){ const btn=document.createElement('span'); btn.className='copy-btn'; btn.textContent='📋'; btn.title='복사'; btn.style.cssText='cursor:pointer;margin-left:10px;font-size:20px;padding:2px 4px;'; btn.onclick=(e)=>{ e.stopPropagation(); copyToClipboard(titleEl.textContent.replace('📋','').trim(),btn); }; titleEl.appendChild(btn); } }
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeDetail(); closeKpiList(); closeCalendarPicker(); } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeDetail(); closeKpiList(); } });
 let kpiListData=[];
 function openKpiList(kind){ let title='',list=[]; if(kind==='total'){ title='전체 현장 ('+sites.length+')'; list=sites.map(s=>({name:s.name,sub:s.company})); } else if(kind==='unvisited'){ const arr=getUnvisitedThisMonth(); title='이번달 미방문 ('+arr.length+')'; list=arr.map(s=>({name:s.name,sub:s.company+' · '+countThisMonth(visitStore[s.name])+'/'+MONTHLY_TARGET+' 방문'})); } else if(kind==='never'){ const arr=getNeverVisited(); title='1회도 방문없음 ('+arr.length+')'; list=arr.map(s=>({name:s.name,sub:s.company})); } else if(kind==='monthly-visits'){ const arr=sites.filter(s=>countThisMonth(visitStore[s.name])>0); title='이번달 방문 현장 (총 '+arr.reduce((sum,s)=>sum+countThisMonth(visitStore[s.name]),0)+'회)'; list=arr.map(s=>({name:s.name,sub:s.company+' · '+countThisMonth(visitStore[s.name])+'회 방문'})); } else if(kind==='completion'){ const arr=getCompletionSoon(); title='준공 임박 30일 이내 ('+arr.length+')'; list=arr.map(s=>({name:s.name,sub:s.company+' · D-'+daysUntil(s.end)+' (준공: '+s.end+')'})); } kpiListData=list; document.getElementById('kpi-list-title').textContent=title; document.getElementById('kpi-list-search').value=''; const box=document.getElementById('kpi-list-box'); box.classList.remove('kpi-box-red','kpi-box-gray'); if(kind==='completion') box.classList.add('kpi-box-red'); if(kind==='never') box.classList.add('kpi-box-gray'); renderKpiListBody(list); document.getElementById('kpi-list-modal').classList.add('active'); }
 function renderKpiListBody(list){ const body=document.getElementById('kpi-list-body'); body.innerHTML=list.length?list.map(item=>'<div class="kpi-list-row" onclick="closeKpiList();openDetailByName(\''+item.name+'\')"><strong>'+item.name+'</strong><span>'+item.sub+'</span></div>').join(''):'<div style="color:#94a3b8;font-size:13px;">검색 결과가 없습니다</div>'; }
@@ -1227,6 +696,3 @@ async function confirmVoiceAction(approved){
 window.addEventListener('resize', handleMobileResize);
 handleMobileResize();
 loadFromNotion();
-</script>
-</body>
-</html>
