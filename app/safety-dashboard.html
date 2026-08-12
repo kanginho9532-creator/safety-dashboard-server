@@ -2397,6 +2397,268 @@ document.addEventListener('DOMContentLoaded', () => {
     showModalFront('company-modal');
   };
 
+
+  function normalizeRepresentativeName(value){
+    return String(value || '').trim();
+  }
+  function isPersonalDirectCompany(companyName){
+    return cleanCompanyName(companyName) === '개인직영공사';
+  }
+  function getCompanyRepresentativeFromSite(site){
+    return normalizeRepresentativeName((site && (site.responsible || site.managerName || site.manager)) || '');
+  }
+  function getCompanyIdentityFromSite(site){
+    const companyName = cleanCompanyName(site && site.company);
+    const representative = getCompanyRepresentativeFromSite(site);
+    if(isPersonalDirectCompany(companyName)){
+      return {
+        key: companyName + '::' + (representative || '미지정'),
+        name: companyName,
+        displayName: representative ? (companyName + ' · ' + representative) : (companyName + ' · 대표자 미지정'),
+        representativeName: representative,
+        isPersonalDirect: true
+      };
+    }
+    return {
+      key: companyName,
+      name: companyName,
+      displayName: companyName,
+      representativeName: representative,
+      isPersonalDirect: false
+    };
+  }
+  function getCompanyIdentityFromCard(company){
+    if(!company) return { key:'', name:'회사명 미지정', displayName:'회사명 미지정', representativeName:'', isPersonalDirect:false };
+    const companyName = cleanCompanyName(company.name || company.companyName);
+    const representative = normalizeRepresentativeName(company.representativeName || company.responsible || ((company.people || [])[0] || {}).name || '');
+    if(isPersonalDirectCompany(companyName)){
+      return {
+        key: company.key || (companyName + '::' + (representative || '미지정')),
+        name: companyName,
+        displayName: company.displayName || (representative ? (companyName + ' · ' + representative) : (companyName + ' · 대표자 미지정')),
+        representativeName: representative,
+        isPersonalDirect: true
+      };
+    }
+    return {
+      key: company.key || companyName,
+      name: companyName,
+      displayName: company.displayName || companyName,
+      representativeName: representative,
+      isPersonalDirect: false
+    };
+  }
+  function buildCompaniesFromSitesV2(siteList){
+    const grouped = new Map();
+    dedupeSitesByName(siteList || sites).forEach(site => {
+      const identity = getCompanyIdentityFromSite(site);
+      if(!grouped.has(identity.key)) grouped.set(identity.key, { key: identity.key, name: identity.name, displayName: identity.displayName, representativeName: identity.representativeName, responsible: site.responsible || '', people: [], contracts: [], contractCount: 0, pageIds: [], isPersonalDirect: identity.isPersonalDirect });
+      const bucket = grouped.get(identity.key);
+      if(!bucket.responsible && site.responsible) bucket.responsible = site.responsible;
+      if(site.managerName || site.contact){
+        const exists = bucket.people.some(person => (person.name || '') === (site.managerName || '') && (person.phone || '') === (site.contact || ''));
+        if(!exists) bucket.people.push({ label:'담당자' + (bucket.people.length + 1), name: site.managerName || '', phone: site.contact || '' });
+      }
+      if(site.name && !bucket.contracts.some(contract => contract.name === site.name)) bucket.contracts.push({ name: site.name, status: site.status || '', end: site.end || '', pageIds: site.pageIds || [] });
+      (site.pageIds || []).forEach(pageId => { if(pageId && !bucket.pageIds.includes(pageId)) bucket.pageIds.push(pageId); });
+    });
+    return Array.from(grouped.values()).map(company => ({
+      ...company,
+      people: company.people.length ? company.people : [{ label:'담당자1', name:'', phone:'' }],
+      contracts: company.contracts.sort((a,b)=>String(a.name).localeCompare(String(b.name), 'ko')),
+      contractCount: company.contracts.length
+    })).sort((a,b)=>String(a.displayName || a.name).localeCompare(String(b.displayName || b.name), 'ko'));
+  }
+  window.deriveCompaniesFromSites = function(){
+    return buildCompaniesFromSitesV2(sites);
+  };
+  window.loadCompanies = async function(){
+    try{
+      const res = await fetch(API_BASE + '/api/companies');
+      const data = await res.json();
+      if(data.ok && Array.isArray(data.companies) && data.companies.length){
+        companies = data.companies.map(company => {
+          const identity = getCompanyIdentityFromCard(company);
+          return {
+            ...company,
+            key: identity.key,
+            name: identity.name,
+            displayName: identity.displayName,
+            representativeName: identity.representativeName,
+            isPersonalDirect: identity.isPersonalDirect,
+            people: Array.isArray(company.people) && company.people.length ? company.people.map((person, idx)=>({ label:person.label || ('담당자' + (idx+1)), name:person.name || '', phone:person.phone || '' })) : [{ label:'담당자1', name:'', phone:'' }],
+            contracts: Array.isArray(company.contracts) ? company.contracts : [],
+            contractCount: Array.isArray(company.contracts) ? company.contracts.length : (company.contractCount || 0),
+            pageIds: Array.isArray(company.pageIds) ? company.pageIds : []
+          };
+        });
+      } else {
+        companies = buildCompaniesFromSitesV2(sites);
+      }
+    }catch(e){
+      companies = buildCompaniesFromSitesV2(sites);
+    }
+    renderCompanyCards();
+  };
+  window.companyCardHtml = function(company){
+    const identity = getCompanyIdentityFromCard(company);
+    const safeKey = String(identity.key || '').replace(/'/g, '&#39;');
+    const safeDisplayName = escapeHtml(identity.displayName || identity.name || '회사명 미지정');
+    const peoplePreview = (company.people || []).filter(person => person.name || person.phone).slice(0,3).map((person, idx)=>'<div>담당자'+(idx+1)+': '+escapeHtml(person.name || '-')+' '+phoneLinkHtml(person.phone || '', person.phone || '전화')+'</div>').join('');
+    return '<div class="company-card" onclick="openCompanyModalByName(\''+safeKey+'\')">'
+      + '<div class="company-card-header"><div class="company-card-title">🏢 '+safeDisplayName+'</div><span class="company-chip">공사 '+(company.contractCount||0)+'건</span></div>'
+      + '<div class="company-card-meta"><div><strong>책임자</strong> · '+escapeHtml(company.responsible || identity.representativeName || '-')+'</div>'
+      + '<div>'+(peoplePreview || '<span style="color:#94a3b8;">담당자 정보 없음</span>')+'</div></div></div>';
+  };
+  window.renderCompanyCards = function(){
+    const grid = document.getElementById('companies-grid');
+    if(!grid) return;
+    const q = (document.getElementById('companies-search')?.value || '').trim().toLowerCase();
+    const list = (companies || []).filter(company => {
+      const hay = [company.displayName, company.name, company.responsible, company.representativeName, ...(company.people||[]).flatMap(person => [person.name, person.phone]), ...(company.contracts||[]).map(contract => contract.name)].join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+    grid.innerHTML = list.length ? list.map(companyCardHtml).join('') : '<div class="company-empty">표시할 회사 카드가 없습니다.</div>';
+  };
+  window.collectCompanyModalData = function(){
+    if(!currentCompanyCard) return null;
+    const people = [];
+    const rows = document.querySelectorAll('#company-people-wrap .company-person-row');
+    rows.forEach((row, idx) => {
+      const label = row.querySelector('[data-kind="label"]').value.trim() || ('담당자' + (idx + 1));
+      const name = row.querySelector('[data-kind="name"]').value.trim();
+      const phone = row.querySelector('[data-kind="phone"]').value.trim();
+      if(label || name || phone) people.push({ label, name, phone });
+    });
+    return {
+      companyKey: currentCompanyCard.key || getCompanyIdentityFromCard(currentCompanyCard).key,
+      companyName: currentCompanyCard.name,
+      companyDisplayName: currentCompanyCard.displayName || currentCompanyCard.name,
+      representativeName: currentCompanyCard.representativeName || currentCompanyCard.responsible || ((people[0] || {}).name || ''),
+      responsible: document.getElementById('company-responsible-input').value.trim(),
+      people,
+      contracts: currentCompanyCard.contracts || [],
+      contractNames: (currentCompanyCard.contracts || []).map(contract => contract.name).filter(Boolean),
+      pageIds: Array.isArray(currentCompanyCard.pageIds) ? currentCompanyCard.pageIds : []
+    };
+  };
+  function findCompanyByIdentifier(identifier){
+    return (companies || []).find(company => company.key === identifier || company.name === identifier || company.displayName === identifier)
+      || buildCompaniesFromSitesV2(sites).find(company => company.key === identifier || company.name === identifier || company.displayName === identifier);
+  }
+  window.openCompanyModalByName = function(identifier, options){
+    const found = findCompanyByIdentifier(identifier);
+    if(!found) return;
+    const safeOptions = options || {};
+    currentCompanyCard = JSON.parse(JSON.stringify(found));
+    if(!Array.isArray(currentCompanyCard.people) || !currentCompanyCard.people.length) currentCompanyCard.people = [{ label:'담당자1', name:'', phone:'' }];
+    document.getElementById('company-modal-title').textContent = currentCompanyCard.displayName || currentCompanyCard.name || '회사명';
+    document.getElementById('company-responsible-input').value = currentCompanyCard.responsible || '';
+    renderCompanyPeopleRows();
+    const allContracts = Array.isArray(currentCompanyCard.contracts) ? currentCompanyCard.contracts : [];
+    const filteredNames = Array.isArray(safeOptions.contractNames) && safeOptions.contractNames.length ? safeOptions.contractNames : null;
+    const filteredContracts = filteredNames ? allContracts.filter(contract => filteredNames.includes(contract.name)) : allContracts;
+    document.getElementById('company-contract-count').textContent = filteredContracts.length + '건' + (filteredNames && filteredContracts.length !== allContracts.length ? ' / 전체 ' + allContracts.length + '건' : '');
+    const contractList = document.getElementById('company-contract-list');
+    contractList.innerHTML = filteredContracts.length
+      ? filteredContracts.map(contract => '<div class="company-contract-item clickable" data-contract-name="' + escapeHtml(contract.name || '') + '"><strong>' + escapeHtml(contract.name || '-') + '</strong><div style="font-size:12px;color:#475569;">' + escapeHtml(contract.status || '상태 미지정') + (contract.end ? ' · 준공 ' + escapeHtml(fmtDateDot(contract.end)) : '') + '</div></div>').join('')
+      : '<div class="company-empty">연결된 공사명이 없습니다.</div>';
+    contractList.querySelectorAll('.company-contract-item.clickable').forEach(el => {
+      el.addEventListener('click', () => openDetailByName(el.dataset.contractName));
+    });
+    currentCompanyOriginal = JSON.stringify(collectCompanyModalData());
+    companyDirty = false;
+    const alert = document.getElementById('company-unsaved-alert');
+    if(alert) alert.style.display = 'none';
+    showModalFront('company-modal');
+  };
+  window.buildCompanyKpiList = function(siteList, subBuilder, sourceKind){
+    const grouped = new Map();
+    (siteList || []).forEach(site => {
+      if(!site || !site.name) return;
+      const identity = getCompanyIdentityFromSite(site);
+      if(!grouped.has(identity.key)) grouped.set(identity.key, { companyKey: identity.key, companyName: identity.name, displayName: identity.displayName, representativeName: identity.representativeName, sites: [], contractNames: [], monthlyVisits: 0, closestCompletion: null });
+      const bucket = grouped.get(identity.key);
+      bucket.sites.push(site);
+      if(!bucket.contractNames.includes(site.name)) bucket.contractNames.push(site.name);
+      bucket.monthlyVisits += countThisMonth(visitStore[site.name]);
+      if(site.end){
+        const remainingDays = daysUntil(site.end);
+        if(remainingDays >= 0 && (bucket.closestCompletion === null || remainingDays < bucket.closestCompletion)) bucket.closestCompletion = remainingDays;
+      }
+    });
+    return Array.from(grouped.values())
+      .sort((a,b)=>String(a.displayName || a.companyName).localeCompare(String(b.displayName || b.companyName), 'ko'))
+      .map(bucket => ({
+        type: 'company',
+        key: bucket.companyKey,
+        name: bucket.displayName || bucket.companyName,
+        rawCompanyName: bucket.companyName,
+        representativeName: bucket.representativeName,
+        sub: typeof subBuilder === 'function' ? subBuilder(bucket) : ('해당 공사 ' + bucket.contractNames.length + '건'),
+        contractNames: bucket.contractNames.slice(),
+        sourceKind,
+        keywords: [bucket.displayName, bucket.companyName].concat(bucket.contractNames).join(' ')
+      }));
+  };
+  window.renderKpiListBody = function(list){
+    const body = document.getElementById('kpi-list-body');
+    if(!body) return;
+    body.innerHTML = '';
+    if(!list || !list.length){
+      body.innerHTML = '<div style="color:#94a3b8;font-size:13px;">검색 결과가 없습니다</div>';
+      return;
+    }
+    list.forEach(item => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'kpi-list-row kpi-list-button';
+      button.innerHTML = '<strong>' + escapeHtml(item.name || '-') + '</strong><span>' + escapeHtml(item.sub || '') + '</span>';
+      button.addEventListener('click', () => {
+        if(item.type === 'company') openCompanyModalByName(item.key || item.name, { contractNames: item.contractNames || [], sourceKind: item.sourceKind || '' });
+        else openDetailByName(item.name);
+      });
+      body.appendChild(button);
+    });
+  };
+  window.saveCompanyCard = async function(){
+    const payload = collectCompanyModalData();
+    if(!payload || !payload.companyName) return;
+    showSyncBanner('회사 카드 노션 저장 중... ' + (payload.companyDisplayName || payload.companyName), '#2563eb');
+    try{
+      const res = await fetch(API_BASE + '/api/company-card', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if(data.ok){
+        showSyncBanner('✅ 회사 카드 저장 완료: ' + (payload.companyDisplayName || payload.companyName), '#16a34a');
+        await loadFromNotion();
+        await loadCompanies();
+        openCompanyModalByName(payload.companyKey || payload.companyName);
+      } else {
+        showSyncBanner('⚠ 회사 카드 저장 실패: ' + (data.error || ''), '#ef4444');
+        await loadFromNotion();
+        await loadCompanies();
+      }
+    }catch(e){
+      showSyncBanner('⚠ 회사 카드 저장 실패: 서버 연결 오류', '#ef4444');
+      await loadFromNotion();
+      await loadCompanies();
+    }
+  };
+  window.openCompanyFromDetail = function(){
+    const siteName = document.getElementById('detail-title')?.textContent?.replace('📋','').trim();
+    const site = (sites || []).find(item => item.name === siteName);
+    if(site){
+      openCompanyModalByName(getCompanyIdentityFromSite(site).key);
+      return;
+    }
+    const name = document.getElementById('detail-company').textContent || document.getElementById('detail-manager-company').textContent;
+    if(name && name !== '-') openCompanyModalByName(name.replace('📋','').trim());
+  };
+
   registerModalStacking();
   setupMobileSideToggles();
 })();
