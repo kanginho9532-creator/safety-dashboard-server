@@ -333,6 +333,46 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
   .main-content,.page,.panel,.calendar,.side-list,.table-wrap,.modal-box{max-width:100%;}
 }
 
+
+/* 2026-08 모바일/대시보드 개선 */
+.grid-top{grid-template-columns:repeat(3,minmax(0,1fr));}
+.kpi-amber{border-left-color:#b45309;background:#fff7ed;}.kpi-amber .value{color:#b45309;}
+.kpi-list-button{width:100%;border:none;text-align:left;font:inherit;}
+#stats table.stat thead th.sticky-site-col,#stats table.stat thead th.sticky-company-col{background:var(--blue);z-index:12;}
+#stats table.stat tbody td.sticky-site-col,#stats table.stat tbody td.sticky-company-col{background:#fff;z-index:5;}
+#stats table.stat th.sticky-site-col,#stats table.stat td.sticky-site-col{position:sticky;left:0;min-width:128px;max-width:128px;}
+#stats table.stat th.sticky-company-col,#stats table.stat td.sticky-company-col{position:sticky;left:128px;min-width:92px;max-width:92px;}
+#stats table.stat th.month-col,#stats table.stat td.month-cell{min-width:58px;text-align:center;}
+.detail-normal-row .item{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:nowrap;}
+.detail-normal-row .item .lbl{margin-bottom:0;white-space:nowrap;flex:0 0 auto;}
+.detail-normal-row .item > :not(.lbl){min-width:0;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;}
+@media (max-width:800px){
+  .grid-top{grid-template-columns:repeat(2,minmax(0,1fr))!important;}
+  .grid-top .kpi:nth-child(5),.grid-top .kpi:nth-child(6){grid-column:span 1!important;min-height:94px!important;display:block!important;}
+  #stats table.stat{min-width:860px!important;}
+  #stats table.stat th.sticky-site-col,#stats table.stat td.sticky-site-col{left:0;min-width:96px;max-width:96px;}
+  #stats table.stat th.sticky-company-col,#stats table.stat td.sticky-company-col{left:96px;min-width:78px;max-width:78px;}
+  #stats table.stat th.month-col,#stats table.stat td.month-cell{min-width:54px;font-size:11px;}
+  #stats .site-tag{max-width:84px;padding:4px 7px;font-size:11px;}
+  #stats table.stat td,#stats table.stat thead th{padding:7px 6px;}
+  .calendar{overflow-x:auto!important;}
+  .cal-grid{min-width:920px!important;gap:6px!important;padding:8px!important;overflow:visible!important;}
+  .cal-grid>div:not(.cal-cell){font-size:13px!important;padding:5px 0!important;}
+  .cal-cell{min-height:118px!important;max-height:168px!important;padding:6px 5px!important;overflow-y:auto!important;overflow-x:hidden!important;border-radius:10px!important;}
+  .cal-cell .date-num{font-size:15px!important;}
+  .today-badge{font-size:10px!important;padding:2px 5px!important;margin-left:4px!important;}
+  .cal-event{font-size:11.5px!important;line-height:1.35!important;padding:5px 6px!important;margin-top:5px!important;border-radius:7px!important;}
+  .detail-normal-row{grid-template-columns:1fr!important;}
+  .detail-normal-row .item{padding:11px 12px;}
+}
+@media (max-width:420px){
+  #stats table.stat{min-width:820px!important;}
+  #stats table.stat th.sticky-site-col,#stats table.stat td.sticky-site-col{min-width:88px;max-width:88px;}
+  #stats table.stat th.sticky-company-col,#stats table.stat td.sticky-company-col{left:88px;min-width:72px;max-width:72px;}
+  #stats .site-tag{max-width:76px;}
+  .cal-grid{min-width:860px!important;}
+}
+
 </style>
 </head>
 <body>
@@ -367,6 +407,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
         <div class="kpi kpi-red" onclick="openKpiList('never')"><div class="label">1회도 방문없음</div><div class="value" id="kpi-never">-</div></div>
         <div class="kpi kpi-green" onclick="openKpiList('monthly-visits')"><div class="label">이번달 총 방문횟수</div><div class="value" id="kpi-monthly-visits">-</div></div>
         <div class="kpi kpi-purple" onclick="openKpiList('completion')"><div class="label">준공 임박(30일)</div><div class="value" id="kpi-completion">-</div></div>
+        <div class="kpi kpi-amber" onclick="openKpiList('contact-missing')"><div class="label">연락요청·비고 없음</div><div class="value" id="kpi-contact-missing">-</div></div>
       </div>
       <div class="dash-two-col">
         <div class="panel dash-scroll">
@@ -404,7 +445,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
         </div>
         <div class="table-wrap">
           <table class="stat" id="stat-table">
-            <thead><tr><th class="sticky-col">공사명</th><th class="sticky-col">회사명</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th></tr></thead>
+            <thead><tr><th class="sticky-col sticky-site-col">공사명</th><th class="sticky-col sticky-company-col">회사명</th><th class="month-col">1월</th><th class="month-col">2월</th><th class="month-col">3월</th><th class="month-col">4월</th><th class="month-col">5월</th><th class="month-col">6월</th><th class="month-col">7월</th><th class="month-col">8월</th><th class="month-col">9월</th><th class="month-col">10월</th><th class="month-col">11월</th><th class="month-col">12월</th></tr></thead>
             <tbody id="stat-tbody"></tbody>
           </table>
         </div>
@@ -607,6 +648,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
   <div class="modal-box" id="kpi-list-box" style="width:520px;">
     <button class="modal-close" onclick="closeKpiList()">✕</button>
     <h3 id="kpi-list-title">-</h3>
+    <div id="kpi-list-subtitle" style="margin-top:6px;color:var(--muted);font-size:12px;line-height:1.5;">회사명을 누르면 해당 공사 목록이 열립니다.</div>
     <input type="text" id="kpi-list-search" placeholder="🔍 공사명/회사명 검색" style="width:100%;box-sizing:border-box;padding:9px 12px;margin-top:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;" oninput="filterKpiList()">
     <div id="kpi-list-body" style="margin-top:12px;max-height:55vh;overflow-y:auto;"></div>
   </div>
@@ -2181,6 +2223,180 @@ document.addEventListener('DOMContentLoaded', () => {
       sideList.insertBefore(toggle, sideList.firstChild);
     });
   }
+
+  function escapeHtml(text){
+    return String(text == null ? '' : text)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+  function cleanCompanyName(name){
+    const value = String(name || '').trim();
+    return value || '회사명 미지정';
+  }
+  function getUniqueSites(){
+    return dedupeSitesByName(Array.isArray(sites) ? sites : []);
+  }
+  function getContactMissingSites(){
+    return getUniqueSites().filter(site => !(contactStore[site.name] || []).length && !String(site.note || '').trim());
+  }
+  function buildCompanyKpiList(siteList, subBuilder, sourceKind){
+    const grouped = new Map();
+    (siteList || []).forEach(site => {
+      if(!site || !site.name) return;
+      const companyName = cleanCompanyName(site.company);
+      if(!grouped.has(companyName)) grouped.set(companyName, { companyName, sites: [], contractNames: [], monthlyVisits: 0, closestCompletion: null });
+      const bucket = grouped.get(companyName);
+      bucket.sites.push(site);
+      if(!bucket.contractNames.includes(site.name)) bucket.contractNames.push(site.name);
+      bucket.monthlyVisits += countThisMonth(visitStore[site.name]);
+      if(site.end){
+        const remainingDays = daysUntil(site.end);
+        if(remainingDays >= 0 && (bucket.closestCompletion === null || remainingDays < bucket.closestCompletion)) bucket.closestCompletion = remainingDays;
+      }
+    });
+    return Array.from(grouped.values())
+      .sort((a,b)=>String(a.companyName).localeCompare(String(b.companyName), 'ko'))
+      .map(bucket => ({
+        type: 'company',
+        name: bucket.companyName,
+        sub: typeof subBuilder === 'function' ? subBuilder(bucket) : ('해당 공사 ' + bucket.contractNames.length + '건'),
+        contractNames: bucket.contractNames.slice(),
+        sourceKind,
+        keywords: [bucket.companyName].concat(bucket.contractNames).join(' ')
+      }));
+  }
+  function setKpiSubtitle(text){
+    const subtitle = document.getElementById('kpi-list-subtitle');
+    if(subtitle) subtitle.textContent = text || '회사명을 누르면 해당 공사 목록이 열립니다.';
+  }
+  window.refreshKPIs = function(){
+    const uniqueSites = getUniqueSites();
+    document.getElementById('kpi-total').textContent = uniqueSites.length;
+    document.getElementById('kpi-unvisited').textContent = getUnvisitedThisMonth().length;
+    document.getElementById('kpi-never').textContent = getNeverVisited().length;
+    document.getElementById('kpi-completion').textContent = getCompletionSoon().length;
+    document.getElementById('kpi-monthly-visits').textContent = uniqueSites.reduce((sum, site) => sum + countThisMonth(visitStore[site.name]), 0);
+    const contactMissingEl = document.getElementById('kpi-contact-missing');
+    if(contactMissingEl) contactMissingEl.textContent = getContactMissingSites().length;
+  };
+  window.renderStatsTable = function(){
+    const q = (document.getElementById('stats-search').value || '').trim().toLowerCase();
+    const tbody = document.getElementById('stat-tbody');
+    if(!tbody) return;
+    const filtered = getUniqueSites().filter(site => [site.name, site.company].join(' ').toLowerCase().includes(q));
+    const sorted = applySortMode(filtered);
+    tbody.innerHTML = sorted.map(site => {
+      const noteHtml = site.note ? '<span class="note-flag" title="' + escapeHtml(site.note) + '">!</span>' : '';
+      let cells = '<td class="sticky-col sticky-site-col">' + siteTag(site) + noteHtml + '</td>'
+        + '<td class="sticky-col sticky-company-col">' + escapeHtml(site.company || '-') + '</td>';
+      for(let month=1; month<=12; month++){
+        const count = (visitStore[site.name] || []).filter(date => new Date(date).getMonth() + 1 === month).length;
+        cells += '<td class="month-cell" style="background:' + (count > 0 ? '#dbeafe' : 'transparent') + ';color:' + (count > 0 ? '#1d4ed8' : 'inherit') + ';font-weight:800;">' + (count > 0 ? '★'.repeat(count) : '') + '</td>';
+      }
+      return '<tr>' + cells + '</tr>';
+    }).join('');
+    if(!sorted.length) tbody.innerHTML = '<tr><td colspan="14" style="padding:24px 12px;text-align:center;color:#94a3b8;">검색 결과가 없습니다.</td></tr>';
+  };
+  window.renderKpiListBody = function(list){
+    const body = document.getElementById('kpi-list-body');
+    if(!body) return;
+    body.innerHTML = '';
+    if(!list || !list.length){
+      body.innerHTML = '<div style="color:#94a3b8;font-size:13px;">검색 결과가 없습니다</div>';
+      return;
+    }
+    list.forEach(item => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'kpi-list-row kpi-list-button';
+      button.innerHTML = '<strong>' + escapeHtml(item.name || '-') + '</strong><span>' + escapeHtml(item.sub || '') + '</span>';
+      button.addEventListener('click', () => {
+        if(item.type === 'company'){
+          openCompanyModalByName(item.name, { contractNames: item.contractNames || [], sourceKind: item.sourceKind || '' });
+        } else {
+          openDetailByName(item.name);
+        }
+      });
+      body.appendChild(button);
+    });
+  };
+  window.filterKpiList = function(){
+    const q = (document.getElementById('kpi-list-search').value || '').trim().toLowerCase();
+    const filtered = (kpiListData || []).filter(item => [item.name, item.sub, item.keywords].join(' ').toLowerCase().includes(q));
+    renderKpiListBody(filtered);
+  };
+  window.openKpiList = function(kind){
+    const uniqueSites = getUniqueSites();
+    let title = '';
+    let subtitle = '회사명을 누르면 해당 공사 목록이 열립니다.';
+    let list = [];
+    if(kind === 'total'){
+      list = buildCompanyKpiList(uniqueSites, bucket => '공사 ' + bucket.contractNames.length + '건', kind);
+      title = '전체 현장 · ' + uniqueSites.length + '건 / 회사 ' + list.length + '곳';
+    } else if(kind === 'unvisited'){
+      const arr = getUnvisitedThisMonth();
+      list = buildCompanyKpiList(arr, bucket => '이번달 미방문 공사 ' + bucket.contractNames.length + '건', kind);
+      title = '이번달 미방문 · 공사 ' + arr.length + '건 / 회사 ' + list.length + '곳';
+    } else if(kind === 'never'){
+      const arr = getNeverVisited();
+      list = buildCompanyKpiList(arr, bucket => '1회도 방문 없는 공사 ' + bucket.contractNames.length + '건', kind);
+      title = '1회도 방문없음 · 공사 ' + arr.length + '건 / 회사 ' + list.length + '곳';
+    } else if(kind === 'monthly-visits'){
+      const arr = uniqueSites.filter(site => countThisMonth(visitStore[site.name]) > 0);
+      const totalVisits = arr.reduce((sum, site) => sum + countThisMonth(visitStore[site.name]), 0);
+      list = buildCompanyKpiList(arr, bucket => '이번달 방문 ' + bucket.monthlyVisits + '회 · 공사 ' + bucket.contractNames.length + '건', kind);
+      title = '이번달 총 방문횟수 · ' + totalVisits + '회 / 회사 ' + list.length + '곳';
+    } else if(kind === 'completion'){
+      const arr = getCompletionSoon();
+      list = buildCompanyKpiList(arr, bucket => '준공 임박 공사 ' + bucket.contractNames.length + '건' + (bucket.closestCompletion !== null ? ' · 가장 빠른 D-' + bucket.closestCompletion : ''), kind);
+      title = '준공 임박 30일 · 공사 ' + arr.length + '건 / 회사 ' + list.length + '곳';
+    } else if(kind === 'contact-missing'){
+      const arr = getContactMissingSites();
+      list = buildCompanyKpiList(arr, bucket => '연락요청·비고 없는 공사 ' + bucket.contractNames.length + '건', kind);
+      title = '긴급 연락 필요 · 공사 ' + arr.length + '건 / 회사 ' + list.length + '곳';
+      subtitle = '연락요청 일정도 없고 비고도 없는 공사만 모았습니다. 회사명을 누르면 해당 공사 목록이 열립니다.';
+    }
+    kpiListData = list;
+    document.getElementById('kpi-list-title').textContent = title;
+    document.getElementById('kpi-list-search').value = '';
+    setKpiSubtitle(subtitle);
+    const box = document.getElementById('kpi-list-box');
+    box.classList.remove('kpi-box-red','kpi-box-gray');
+    if(kind === 'completion') box.classList.add('kpi-box-red');
+    if(kind === 'never') box.classList.add('kpi-box-gray');
+    renderKpiListBody(list);
+    showModalFront('kpi-list-modal');
+  };
+  window.openCompanyModalByName = function(companyName, options){
+    const found = (companies || []).find(company => company.name === companyName) || deriveCompaniesFromSites().find(company => company.name === companyName);
+    if(!found) return;
+    const safeOptions = options || {};
+    currentCompanyCard = JSON.parse(JSON.stringify(found));
+    if(!Array.isArray(currentCompanyCard.people) || !currentCompanyCard.people.length) currentCompanyCard.people = [{ label:'담당자1', name:'', phone:'' }];
+    document.getElementById('company-modal-title').textContent = currentCompanyCard.name || '회사명';
+    document.getElementById('company-responsible-input').value = currentCompanyCard.responsible || '';
+    renderCompanyPeopleRows();
+    const allContracts = Array.isArray(currentCompanyCard.contracts) ? currentCompanyCard.contracts : [];
+    const filteredNames = Array.isArray(safeOptions.contractNames) && safeOptions.contractNames.length ? safeOptions.contractNames : null;
+    const filteredContracts = filteredNames ? allContracts.filter(contract => filteredNames.includes(contract.name)) : allContracts;
+    document.getElementById('company-contract-count').textContent = filteredContracts.length + '건' + (filteredNames && filteredContracts.length !== allContracts.length ? ' / 전체 ' + allContracts.length + '건' : '');
+    const contractList = document.getElementById('company-contract-list');
+    contractList.innerHTML = filteredContracts.length
+      ? filteredContracts.map(contract => '<div class="company-contract-item clickable" data-contract-name="' + escapeHtml(contract.name || '') + '"><strong>' + escapeHtml(contract.name || '-') + '</strong><div style="font-size:12px;color:#475569;">' + escapeHtml(contract.status || '상태 미지정') + (contract.end ? ' · 준공 ' + escapeHtml(fmtDateDot(contract.end)) : '') + '</div></div>').join('')
+      : '<div class="company-empty">연결된 공사명이 없습니다.</div>';
+    contractList.querySelectorAll('.company-contract-item.clickable').forEach(el => {
+      el.addEventListener('click', () => openDetailByName(el.dataset.contractName));
+    });
+    currentCompanyOriginal = JSON.stringify(collectCompanyModalData());
+    companyDirty = false;
+    const alert = document.getElementById('company-unsaved-alert');
+    if(alert) alert.style.display = 'none';
+    showModalFront('company-modal');
+  };
+
   registerModalStacking();
   setupMobileSideToggles();
 })();
