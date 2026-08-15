@@ -427,7 +427,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 .detail-photo-empty{ font-size:12px; color:#64748b; margin-top:8px; }
 #contact-calendar .side-list{display:none;}
 #contact-calendar .calendar{grid-column:1 / -1;}
-#detail-modal .modal-box{width:min(1120px,96vw);}
+#detail-modal .modal-box{width:min(920px,92vw);padding:20px 18px;overflow-x:hidden;}
 #detail-modal .detail-manager-row,
 #detail-modal .detail-highlight,
 #detail-modal .detail-normal-row,
@@ -437,6 +437,17 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 #detail-modal #detail-photo-wrap,
 #detail-modal #detail-schedule-editor{min-width:0!important;}
 #detail-modal .detail-scroll-shell{overflow-x:hidden;}
+#detail-modal .detail-manager-row,#detail-modal .detail-highlight,#detail-modal .detail-normal-row{gap:8px;margin-bottom:10px;}
+#detail-modal .mgr-item{padding:10px 8px;gap:6px;}
+#detail-modal .mgr-item .lbl{font-size:12px;}
+#detail-modal .mgr-item .val{font-size:15px;}
+#detail-modal .detail-box{padding:10px 11px;}
+#detail-modal .detail-box .lbl{font-size:12px;}
+#detail-modal .detail-box .val{font-size:15px;}
+#detail-modal .detail-normal-row .item{padding:10px 12px;}
+#detail-modal .detail-edit-input,#detail-modal .detail-edit-textarea{font-size:14px;}
+.detail-company-open-name{display:inline-flex;align-items:center;gap:6px;color:#1d4ed8;font-weight:800;cursor:pointer;text-decoration:underline;}
+.detail-company-open-name:hover{color:#1e40af;}
 .drag-card-count{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:24px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:800;flex-shrink:0;}
 .drag-card.zero .drag-card-count{background:#facc15;color:#3f3200;}
 .drag-card.one .drag-card-count{background:#2563eb;color:#fff;}
@@ -624,12 +635,10 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
       <div class="cal-layout">
         <div class="side-list">
           <div class="side-section">
-            <h4>이번달 미연락요청 현장</h4>
             <input type="text" id="cal-site-search-2-unvisited" class="side-search" placeholder="🔍 연락요청 미달 검색" oninput="filterCalSiteList2()">
             <div id="unvisited-cards-2"></div>
           </div>
           <div class="side-section">
-            <h4>연락요청 이력 없는 현장</h4>
             <input type="text" id="cal-site-search-2-never" class="side-search" placeholder="🔍 연락요청 없음 검색" oninput="filterCalSiteList2()">
             <div id="never-cards-2"></div>
           </div>
@@ -2852,7 +2861,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const text = await res.text();
     let data = null;
     try{ data = text ? JSON.parse(text) : null; }catch(err){
-      throw new Error('서버가 JSON이 아닌 응답을 반환했습니다. 배포 서버의 API 경로를 확인해주세요.');
+      const preview = String(text || '').slice(0, 80).replace(/\s+/g, ' ');
+      throw new Error('서버가 JSON이 아닌 응답을 반환했습니다. API 경로 또는 배포 경로를 확인해주세요. ' + preview);
     }
     if(!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status));
     return data;
@@ -2862,16 +2872,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const payload = { pageIds: Array.isArray(pageIdsOverride) && pageIdsOverride.length ? pageIdsOverride : getSitePageIds(site), siteName, updates };
     if(!payload.pageIds.length && !siteName) return false;
     showSyncBanner('노션 실시간 저장 중... ' + siteName, '#2563eb');
-    const res = await fetch(API_BASE + '/api/update-site-fields', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
-    });
-    const data = await parseApiJsonSafe(res);
-    if(!data.ok) throw new Error(data.error || 'update failed');
-    showSyncBanner('✅ 노션 실시간 저장 완료: ' + siteName, '#16a34a');
-    scheduleNotionRefresh();
-    return true;
+    const endpointCandidates = Array.from(new Set([
+      API_BASE + '/api/update-site-fields',
+      '/api/update-site-fields',
+      './api/update-site-fields',
+      '/app/api/update-site-fields',
+      './app/api/update-site-fields',
+      '/update-site-fields'
+    ].filter(Boolean)));
+    let lastError = null;
+    for(const endpoint of endpointCandidates){
+      try{
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json','Accept':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        const data = await parseApiJsonSafe(res);
+        if(!data.ok) throw new Error(data.error || 'update failed');
+        showSyncBanner('✅ 노션 실시간 저장 완료: ' + siteName, '#16a34a');
+        scheduleNotionRefresh();
+        return true;
+      }catch(err){
+        lastError = err;
+      }
+    }
+    throw lastError || new Error('노션 저장 경로를 찾지 못했습니다.');
   }
   async function onDetailFieldCommit(fieldKey, rawValue){
     const siteName = currentDetailSiteName;
@@ -2953,7 +2979,7 @@ document.addEventListener('DOMContentLoaded', () => {
     currentDetailSiteName = site.name;
     const titleEl = document.getElementById('detail-title');
     titleEl.innerHTML = '<div class="detail-title-edit"><input id="detail-title-input" class="detail-edit-input" value="' + escapeAttr(site.name || '') + '"><span class="detail-live-badge">실시간 수정 · 노션 즉시 반영</span></div>';
-    renderDetailEditableField('detail-manager-company', 'detail-company-input', 'text', site.company || '', '<button type="button" class="detail-inline-link-btn" onclick="openCompanyFromDetail()">회사 카드 열기</button>');
+    renderDetailEditableField('detail-manager-company', 'detail-company-input', 'text', site.company || '', '<div class="detail-inline-help"><span class="detail-company-open-name" onclick="openCompanyFromDetail()">🏢 ' + escapeHtml(site.company || '회사 카드 열기') + '</span></div>');
     renderDetailEditableField('detail-manager-site', 'detail-site-input-top', 'text', site.site || site.region || '');
     renderDetailEditableField('detail-manager-name', 'detail-manager-name-input', 'text', site.managerName || '');
     renderDetailEditableField('detail-manager-contact', 'detail-manager-contact-input', 'text', site.contact || '', normalizePhone(site.contact) ? '<div class="detail-inline-help"><a class="detail-call-link" href="tel:' + normalizePhone(site.contact) + '">전화 걸기</a></div>' : '<div class="detail-inline-help">전화번호를 입력하면 모바일에서 바로 연결할 수 있습니다.</div>');
@@ -3696,7 +3722,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('detail-modal');
     if(!modal) return;
     if(modal.contains(document.activeElement) && document.activeElement?.blur) document.activeElement.blur();
-    await new Promise(resolve => setTimeout(resolve, 40));
+    await new Promise(resolve => setTimeout(resolve, 120));
     if(detailPendingSaves.size){
       showSyncBanner('노션 저장을 마무리하는 중입니다...', '#2563eb');
       await Promise.allSettled(Array.from(detailPendingSaves));
@@ -3898,7 +3924,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ensureDetailAuxBlocks();
     const titleEl = document.getElementById('detail-title');
     titleEl.innerHTML = '<div class="detail-title-edit"><input id="detail-title-input" class="detail-edit-input" value="' + escapeAttr(site.name || '') + '"><span class="detail-live-badge">실시간 수정 · 노션 즉시 반영</span></div>';
-    renderDetailEditableField('detail-manager-company', 'detail-company-input', 'text', site.company || '', '<button type="button" class="detail-inline-link-btn" onclick="openCompanyFromDetail()">회사 카드 열기</button>');
+    renderDetailEditableField('detail-manager-company', 'detail-company-input', 'text', site.company || '', '<div class="detail-inline-help"><span class="detail-company-open-name" onclick="openCompanyFromDetail()">🏢 ' + escapeHtml(site.company || '회사 카드 열기') + '</span></div>');
     renderDetailEditableField('detail-manager-site', 'detail-site-input-top', 'text', site.site || site.region || '');
     renderDetailEditableField('detail-manager-name', 'detail-manager-name-input', 'text', site.managerName || '');
     renderDetailEditableField('detail-manager-contact', 'detail-manager-contact-input', 'text', site.contact || '', normalizePhone(site.contact) ? '<div class="detail-inline-help"><a class="detail-call-link" href="tel:' + normalizePhone(site.contact) + '">전화 걸기</a></div>' : '<div class="detail-inline-help">전화번호를 입력하면 모바일에서 바로 연결할 수 있습니다.</div>');
