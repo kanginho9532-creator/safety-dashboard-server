@@ -402,6 +402,50 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
   .cal-add-btn{width:20px;height:20px;font-size:14px;}
 }
 
+
+/* 2026-08-15 detail/calendar productivity enhancements */
+#detail-modal .mgr-item,
+#detail-modal .detail-box,
+#detail-modal .detail-normal-row .item,
+#detail-modal .detail-note,
+#detail-modal .detail-schedule-col,
+#detail-modal .detail-photo-wrap{ text-align:center; }
+#detail-modal .mgr-item .val,
+#detail-modal .detail-box .val,
+#detail-modal .detail-normal-row .item > div:last-child{ justify-content:center; }
+#detail-modal .detail-edit-input,
+#detail-modal .detail-edit-textarea,
+#detail-modal .detail-edit-select,
+#detail-modal .detail-schedule-input{ text-align:center; }
+#detail-modal .detail-edit-textarea{ min-height:88px; }
+.detail-note-under-title{ margin:10px 0 14px; }
+.detail-photo-wrap{ margin:12px 0 14px; background:#f8fafc; border:1.5px solid var(--border); border-radius:12px; padding:14px; }
+.detail-photo-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-top:10px; }
+.detail-photo-card{ display:flex; flex-direction:column; gap:8px; align-items:center; text-decoration:none; color:#0f172a; background:white; border:1px solid #dbe4ee; border-radius:10px; padding:10px; }
+.detail-photo-card img{ width:100%; max-height:120px; object-fit:cover; border-radius:8px; background:#e5e7eb; }
+.detail-photo-card .photo-label{ font-size:12px; font-weight:700; word-break:break-all; }
+.detail-photo-empty{ font-size:12px; color:#64748b; margin-top:8px; }
+.detail-schedule-editor{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:12px 0 14px; }
+.detail-schedule-col{ background:#f8fafc; border:1.5px solid var(--border); border-radius:12px; padding:14px; }
+.detail-schedule-head{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; }
+.detail-schedule-head strong{ font-size:13px; color:#334155; }
+.detail-schedule-add{ display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+.detail-schedule-add .detail-schedule-input{ flex:1; }
+.detail-schedule-add button,.detail-schedule-row button,.undo-calendar-btn{ border:none; border-radius:8px; cursor:pointer; font-weight:700; }
+.detail-schedule-add button{ padding:8px 10px; background:#2563eb; color:#fff; }
+.detail-schedule-row{ display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; margin-bottom:8px; }
+.detail-schedule-input{ width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; background:white; font-size:13px; }
+.detail-schedule-row button{ padding:8px 10px; background:#fee2e2; color:#b91c1c; }
+.detail-schedule-empty{ font-size:12px; color:#64748b; padding:10px 0 4px; }
+.cal-event-name{ display:block; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cal-event-sub{ display:block; margin-top:2px; font-size:10px; opacity:.92; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.undo-calendar-btn{ position:fixed; right:16px; bottom:16px; z-index:650; padding:12px 14px; background:#0f172a; color:#fff; box-shadow:0 8px 22px rgba(15,23,42,.28); display:none; }
+.undo-calendar-btn.show{ display:inline-flex; align-items:center; gap:6px; }
+@media (max-width:800px){
+  .detail-schedule-editor{ grid-template-columns:1fr; }
+  .detail-photo-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+
 </style>
 </head>
 <body>
@@ -3347,6 +3391,520 @@ document.addEventListener('DOMContentLoaded', () => {
     driveMode.pending = null;
     setTimeout(()=>closeDriveMode(), 1200);
   };
+
+
+  const ACTIVE_CONTACT_MONTH_END = new Date(curYear, curMonth + 1, 0);
+  const CALENDAR_COLOR_RULES = {
+    zero: { background: '#facc15', text: '#3f3200' },
+    one: { background: '#2563eb', text: '#ffffff' },
+    two: { background: '#16a34a', text: '#ffffff' }
+  };
+  let detailPendingSaves = new Set();
+  let undoCalendarStack = [];
+  function monthVisitCountForSite(siteName){ return countThisMonth(visitStore[siteName] || []); }
+  function getCalendarEventStyle(siteName){
+    const cnt = monthVisitCountForSite(siteName);
+    if(cnt >= 2) return CALENDAR_COLOR_RULES.two;
+    if(cnt === 1) return CALENDAR_COLOR_RULES.one;
+    return CALENDAR_COLOR_RULES.zero;
+  }
+  function isVisibleContactDate(dateStr){
+    if(!dateStr) return false;
+    return new Date(dateStr + 'T23:59:59') <= ACTIVE_CONTACT_MONTH_END;
+  }
+  function getVisibleContactDates(siteName){ return (contactStore[siteName] || []).filter(isVisibleContactDate).slice().sort(); }
+  function getLatestVisitDisplay(siteName){
+    const dates = (visitStore[siteName] || []).slice().sort();
+    if(!dates.length) return '최근 방문 없음';
+    return '최근 ' + fmtDateDot(dates[dates.length - 1]).slice(5);
+  }
+  function getContactPendingThisMonth(){
+    return getDashboardSites().filter(site => {
+      const currentMonthContacts = getVisibleContactDates(site.name).filter(dateStr => {
+        const dt = new Date(dateStr + 'T00:00:00');
+        return dt.getFullYear() === curYear && dt.getMonth() === curMonth;
+      });
+      return currentMonthContacts.length === 0;
+    });
+  }
+  function getContactNeverRequested(){
+    return getDashboardSites().filter(site => !(contactStore[site.name] || []).length && !site.contactRequest);
+  }
+  function createUndoButton(){
+    let btn = document.getElementById('undo-calendar-btn');
+    if(btn) return btn;
+    btn = document.createElement('button');
+    btn.id = 'undo-calendar-btn';
+    btn.className = 'undo-calendar-btn';
+    btn.type = 'button';
+    btn.innerHTML = '↶ 돌아가기';
+    btn.onclick = () => undoLastCalendarAction();
+    document.body.appendChild(btn);
+    return btn;
+  }
+  function updateUndoButton(){
+    const btn = createUndoButton();
+    btn.classList.toggle('show', undoCalendarStack.length > 0);
+    btn.innerHTML = '↶ 돌아가기' + (undoCalendarStack.length ? ' (' + undoCalendarStack.length + ')' : '');
+  }
+  function pushUndoCalendar(entry){
+    if(!entry || !entry.changes || !entry.changes.length) return;
+    undoCalendarStack.push(entry);
+    if(undoCalendarStack.length > 50) undoCalendarStack.shift();
+    updateUndoButton();
+  }
+  function persistCalendarStores(){
+    saveStore(STORE_KEY, visitStore);
+    saveStore(CONTACT_KEY, contactStore);
+    saveStore(VISIT_PAGEMAP_KEY, visitPageMap);
+    saveStore(CONTACT_PAGEMAP_KEY, contactPageMap);
+  }
+  function removeDateFromStore(storeType, siteName, dateStr){
+    const store = storeType === 'visit' ? visitStore : contactStore;
+    if(!store[siteName]) return false;
+    const idx = store[siteName].indexOf(dateStr);
+    if(idx === -1) return false;
+    store[siteName].splice(idx, 1);
+    if(!store[siteName].length) delete store[siteName];
+    return true;
+  }
+  function addDateToStoreLocal(storeType, siteName, dateStr){
+    const store = storeType === 'visit' ? visitStore : contactStore;
+    store[siteName] = store[siteName] || [];
+    if(store[siteName].includes(dateStr)) return false;
+    store[siteName].push(dateStr);
+    return true;
+  }
+  async function undoLastCalendarAction(){
+    const entry = undoCalendarStack.pop();
+    updateUndoButton();
+    if(!entry) return;
+    showSyncBanner('되돌리는 중...', '#0f172a');
+    for(const change of entry.changes.slice().reverse()){
+      if(change.kind === 'add'){
+        if(removeDateFromStore(change.store, change.site, change.date)){
+          persistCalendarStores();
+          await syncDeleteDate(change.store, change.site, change.date);
+        }
+      }else if(change.kind === 'delete'){
+        if(addDateToStoreLocal(change.store, change.site, change.date)){
+          persistCalendarStores();
+          await syncAddDate(change.store, change.site, change.date);
+        }
+      }else if(change.kind === 'move'){
+        const targetStore = change.store === 'visit' ? visitStore : contactStore;
+        const arr = targetStore[change.site] || [];
+        const idx = arr.indexOf(change.to);
+        if(idx >= 0) arr.splice(idx, 1);
+        if(!arr.includes(change.from)) arr.push(change.from);
+        targetStore[change.site] = arr;
+        persistCalendarStores();
+        await syncMoveDate(change.store, change.site, change.to, change.from);
+      }
+    }
+    refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
+    if(currentDetailSiteName) openDetailByName(currentDetailSiteName);
+    showSyncBanner('↶ 마지막 일정 작업을 되돌렸습니다.', '#16a34a');
+  }
+  async function trackDetailSave(promise){
+    detailPendingSaves.add(promise);
+    try{ return await promise; }
+    finally{ detailPendingSaves.delete(promise); }
+  }
+  function extractUrlsFromText(text){
+    const matches = String(text || '').match(/https?:\/\/[^\s)]+/g);
+    return matches ? matches : [];
+  }
+  function extractDriveId(url){
+    const str = String(url || '');
+    let match = str.match(/\/d\/([^/]+)/);
+    if(match) return match[1];
+    match = str.match(/[?&]id=([^&#]+)/);
+    if(match) return match[1];
+    return '';
+  }
+  function previewUrlFromPhoto(url){
+    const driveId = extractDriveId(url);
+    if(driveId) return 'https://drive.google.com/thumbnail?id=' + driveId + '&sz=w1000';
+    return url;
+  }
+  function isRenderableImageUrl(url){
+    return /(png|jpe?g|webp|gif|bmp|svg)(\?|$)/i.test(String(url || '')) || Boolean(extractDriveId(url));
+  }
+  function extractPhotoUrlsFromSite(site){
+    const urls = new Set(Array.isArray(site.photoUrls) ? site.photoUrls : []);
+    const props = site.rawProperties || {};
+    const keywords = ['사진','이미지','photo','img','파일','구글','drive'];
+    Object.entries(props).forEach(([key, prop]) => {
+      const keyNorm = String(key || '').toLowerCase();
+      const likely = keywords.some(keyword => keyNorm.includes(keyword.toLowerCase()));
+      if(prop?.type === 'files' || likely){
+        if(prop?.files){
+          prop.files.forEach(file => {
+            const fileUrl = file?.external?.url || file?.file?.url || file?.url || '';
+            if(fileUrl) urls.add(fileUrl);
+          });
+        }
+        if(prop?.type === 'url' && prop.url) urls.add(prop.url);
+        if(prop?.type === 'rich_text') prop.rich_text.forEach(item => { if(item?.href) urls.add(item.href); extractUrlsFromText(item?.plain_text || '').forEach(url => urls.add(url)); });
+        if(prop?.type === 'title') prop.title.forEach(item => { if(item?.href) urls.add(item.href); extractUrlsFromText(item?.plain_text || '').forEach(url => urls.add(url)); });
+      }
+    });
+    return Array.from(urls).filter(Boolean);
+  }
+  function ensureDetailAuxBlocks(){
+    const shell = document.querySelector('#detail-modal .detail-scroll-shell');
+    if(!shell) return {};
+    const noteWrap = document.getElementById('detail-note-wrap');
+    const managerRow = shell.querySelector('.detail-manager-row');
+    if(noteWrap && managerRow) shell.insertBefore(noteWrap, managerRow);
+    noteWrap?.classList.add('detail-note-under-title');
+    let photoWrap = document.getElementById('detail-photo-wrap');
+    if(!photoWrap){ photoWrap = document.createElement('div'); photoWrap.id = 'detail-photo-wrap'; photoWrap.className = 'detail-photo-wrap'; noteWrap?.insertAdjacentElement('afterend', photoWrap); }
+    let scheduleWrap = document.getElementById('detail-schedule-editor');
+    if(!scheduleWrap){ scheduleWrap = document.createElement('div'); scheduleWrap.id = 'detail-schedule-editor'; scheduleWrap.className = 'detail-schedule-editor'; const progressPanel = shell.querySelector('.detail-progress-panel'); if(progressPanel) shell.insertBefore(scheduleWrap, progressPanel); }
+    const siteItem = document.getElementById('detail-site')?.closest('.item');
+    if(siteItem){ siteItem.style.display = 'none'; }
+    return { noteWrap, photoWrap, scheduleWrap, siteItem };
+  }
+  function renderPhotoSection(site){
+    const photoWrap = document.getElementById('detail-photo-wrap');
+    if(!photoWrap) return;
+    const urls = extractPhotoUrlsFromSite(site);
+    photoWrap.innerHTML = '<div class="lbl" style="font-size:13px;color:var(--muted);font-weight:700;">사진 / 구글 드라이브</div>';
+    if(!urls.length){ photoWrap.innerHTML += '<div class="detail-photo-empty">연결된 사진 속성이 없습니다.</div>'; return; }
+    const grid = document.createElement('div');
+    grid.className = 'detail-photo-grid';
+    urls.forEach((url, index) => {
+      const a = document.createElement('a');
+      a.className = 'detail-photo-card';
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      const label = document.createElement('div');
+      label.className = 'photo-label';
+      label.textContent = '사진 ' + (index + 1);
+      if(isRenderableImageUrl(url)){
+        const img = document.createElement('img');
+        img.src = previewUrlFromPhoto(url);
+        img.alt = '현장 사진 ' + (index + 1);
+        a.appendChild(img);
+      }
+      a.appendChild(label);
+      grid.appendChild(a);
+    });
+    photoWrap.appendChild(grid);
+  }
+  function renderScheduleColumn(storeType, siteName, dates, title){
+    const safeName = escapeAttr(siteName);
+    const addInputId = 'detail-new-' + storeType + '-date';
+    return '<div class="detail-schedule-col">'
+      + '<div class="detail-schedule-head"><strong>' + title + '</strong><span style="font-size:11px;color:#64748b;">즉시 저장</span></div>'
+      + '<div class="detail-schedule-add"><input id="' + addInputId + '" class="detail-schedule-input" type="date"><button type="button" onclick="addDetailScheduleDate(\'' + storeType + '\',\'' + safeName + '\')">추가</button></div>'
+      + (dates.length ? dates.map(dateStr => '<div class="detail-schedule-row"><input class="detail-schedule-input" type="date" value="' + escapeAttr(dateStr) + '" onchange="changeDetailScheduleDate(\'' + storeType + '\',\'' + safeName + '\',\'' + dateStr + '\', this)"><button type="button" onclick="deleteDetailScheduleDate(\'' + storeType + '\',\'' + safeName + '\',\'' + dateStr + '\')">삭제</button></div>').join('') : '<div class="detail-schedule-empty">등록된 일정이 없습니다.</div>')
+      + '</div>';
+  }
+  function renderDetailScheduleEditor(site){
+    const wrap = document.getElementById('detail-schedule-editor');
+    if(!wrap) return;
+    const visitDates = (visitStore[site.name] || []).slice().sort().reverse();
+    const contactDates = getVisibleContactDates(site.name).slice().reverse();
+    wrap.innerHTML = renderScheduleColumn('contact', site.name, contactDates, '연락요청일자') + renderScheduleColumn('visit', site.name, visitDates, '방문일자');
+  }
+  async function rerenderDetailAfterDateChange(siteName){
+    refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
+    openDetailByName(siteName);
+  }
+  window.addDetailScheduleDate = async function(storeType, siteName){
+    const input = document.getElementById('detail-new-' + storeType + '-date');
+    const dateStr = input?.value;
+    if(!dateStr) return;
+    await addSiteScheduleWithSync(siteName, storeType, dateStr);
+    input.value = '';
+    await rerenderDetailAfterDateChange(siteName);
+  };
+  window.changeDetailScheduleDate = async function(storeType, siteName, oldDate, input){
+    const newDate = input.value;
+    if(!newDate || newDate === oldDate) return;
+    const store = storeType === 'visit' ? visitStore : contactStore;
+    const arr = store[siteName] || [];
+    const idx = arr.indexOf(oldDate);
+    if(idx >= 0) arr.splice(idx, 1);
+    if(!arr.includes(newDate)) arr.push(newDate);
+    store[siteName] = arr;
+    persistCalendarStores();
+    pushUndoCalendar({ title:'일정 수정', changes:[{ kind:'move', store:storeType, site:siteName, from:oldDate, to:newDate }] });
+    refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
+    await syncMoveDate(storeType, siteName, oldDate, newDate);
+    await rerenderDetailAfterDateChange(siteName);
+  };
+  window.deleteDetailScheduleDate = async function(storeType, siteName, dateStr){
+    if(!removeDateFromStore(storeType, siteName, dateStr)) return;
+    persistCalendarStores();
+    pushUndoCalendar({ title:'일정 삭제', changes:[{ kind:'delete', store:storeType, site:siteName, date:dateStr }] });
+    refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
+    await syncDeleteDate(storeType, siteName, dateStr);
+    await rerenderDetailAfterDateChange(siteName);
+  };
+  const originalSaveSiteFieldsRealtime = saveSiteFieldsRealtime;
+  saveSiteFieldsRealtime = async function(siteName, updates, pageIdsOverride){
+    return trackDetailSave(originalSaveSiteFieldsRealtime(siteName, updates, pageIdsOverride));
+  };
+  closeDetail = async function(){
+    const modal = document.getElementById('detail-modal');
+    if(!modal) return;
+    if(modal.contains(document.activeElement) && document.activeElement?.blur) document.activeElement.blur();
+    await new Promise(resolve => setTimeout(resolve, 40));
+    if(detailPendingSaves.size){
+      showSyncBanner('노션 저장을 마무리하는 중입니다...', '#2563eb');
+      await Promise.allSettled(Array.from(detailPendingSaves));
+    }
+    modal.classList.remove('active');
+  };
+  renderSideCards = function(containerIdUnvisited, containerIdNever, storeType){
+    const cUn = document.getElementById(containerIdUnvisited); const cNev = document.getElementById(containerIdNever);
+    if(!cUn || !cNev) return;
+    cUn.innerHTML = ''; cNev.innerHTML = '';
+    const bindCard = (el,payload)=>{ el.addEventListener('click',e=>{ e.stopPropagation(); setSelectedSideCard(payload, el); }); el.addEventListener('dragstart',e=>{ setSelectedSideCard(payload, el); e.dataTransfer.effectAllowed='copyMove'; e.dataTransfer.setData('text/plain',JSON.stringify(payload)); }); el.addEventListener('dblclick',()=>openDetailByName(payload.site)); el.addEventListener('contextmenu',e=>showContextMenu(e,payload.site,payload.store,'')); };
+    const primaryList = storeType === 'contact' ? getContactPendingThisMonth() : getUnvisitedThisMonth();
+    const secondaryList = storeType === 'contact' ? getContactNeverRequested() : getNeverVisited();
+    primaryList.forEach(site=>{ const payload={mode:'new',site:site.name,store:storeType}; const el=document.createElement('div'); el.className='drag-card'; el.draggable=true; el.style.borderLeft='4px solid '+siteColor(site.name); el.dataset.siteName=site.name; el.title=site.name+' · '+site.company; el.innerHTML='<span class="drag-card-text">'+escapeHtml(site.name)+' · '+escapeHtml(site.company||'-')+'</span>'+noteFlag(site); bindCard(el,payload); cUn.appendChild(el); });
+    if(!cUn.children.length) cUn.innerHTML='<div class="side-empty">표시할 현장이 없습니다.</div>';
+    secondaryList.forEach(site=>{ const payload={mode:'new',site:site.name,store:storeType}; const el=document.createElement('div'); el.className='drag-card never'; el.draggable=true; el.style.borderLeft='4px solid '+siteColor(site.name); el.dataset.siteName=site.name; el.title=site.name+' · '+site.company; el.innerHTML='<span class="drag-card-text">'+escapeHtml(site.name)+' · '+escapeHtml(site.company||'-')+'</span>'+noteFlag(site); bindCard(el,payload); cNev.appendChild(el); });
+    if(!cNev.children.length) cNev.innerHTML='<div class="side-empty">표시할 현장이 없습니다.</div>';
+    filterCalSiteList(); filterCalSiteList2();
+  };
+  renderCalendarWorkbench = function(gridId,state,store,railId,focusId,countId,summaryId,label){
+    const rail=document.getElementById(railId), focusEl=document.getElementById(focusId), countEl=document.getElementById(countId), summary=document.getElementById(summaryId);
+    if(!rail||!focusEl||!countEl||!summary) return;
+    const focusDate=getCalendarFocusDate(gridId,state); const focus=new Date(focusDate+'T00:00:00');
+    const days=['일','월','화','수','목','금','토']; const isToday=focusDate===calendarDateString(now); const dayEvents=[];
+    Object.entries(store).forEach(([site,dateArr])=>{ const visibleDates = gridId==='cal-grid-contact' ? (dateArr||[]).filter(isVisibleContactDate) : (dateArr||[]); if(visibleDates.includes(focusDate)) dayEvents.push(site); });
+    focusEl.textContent=(focus.getMonth()+1)+'월 '+focus.getDate()+'일 · '+days[focus.getDay()] + (isToday?' · 오늘':'');
+    countEl.textContent=dayEvents.length+'건'; rail.innerHTML='';
+    for(let offset=-3;offset<=3;offset++){
+      const date=new Date(focus); date.setDate(focus.getDate()+offset); const dateStr=calendarDateString(date); const button=document.createElement('button');
+      button.type='button'; button.className='date-rail-item'+(dateStr===focusDate?' active':''); button.innerHTML='<span>'+days[date.getDay()]+'</span><strong>'+date.getDate()+'</strong>';
+      button.setAttribute('aria-label',(date.getMonth()+1)+'월 '+date.getDate()+'일 '+label+' 보기'); button.onclick=()=>{ lastFocusedGridId=gridId; lastFocusedCellDate=dateStr; refreshCalendars(); };
+      rail.appendChild(button);
+    }
+    if(dayEvents.length){
+      summary.innerHTML='<p class="calendar-summary-copy">오늘 처리할 '+label+' '+dayEvents.length+'건</p><div class="calendar-summary-list"></div>';
+      const list=summary.querySelector('.calendar-summary-list');
+      dayEvents.forEach(siteName=>{ const source=getSiteByName(siteName)||{}; const item=document.createElement('button'); item.type='button'; item.className='calendar-summary-item'; item.innerHTML='<span>●</span><span>'+escapeHtml(siteName)+'<small>'+escapeHtml(source.company||'담당자 확인 필요')+' · '+escapeHtml(getLatestVisitDisplay(siteName))+'</small></span>'; item.onclick=()=>openDetailByName(siteName); list.appendChild(item); });
+    }else{
+      summary.innerHTML='<div class="calendar-summary-empty"><span>○</span><span><strong>오늘은 '+label+'이 없습니다.</strong>아래 목록에서 현장을 선택한 뒤 날짜를 눌러 등록하세요.</span></div>';
+    }
+  };
+  renderCalendarGrid = function(gridId,labelId,state,store,eventClass,storeKeyName){
+    const grid=document.getElementById(gridId); const label=document.getElementById(labelId);
+    if(!grid || !label) return;
+    grid.innerHTML=''; label.textContent=state.year+'년 '+(state.month+1)+'월';
+    const firstDay=new Date(state.year,state.month,1).getDay();
+    const daysInMonth=new Date(state.year,state.month+1,0).getDate();
+    const weekNames=['일','월','화','수','목','금','토'];
+    weekNames.forEach((w,wi)=>{ const h=document.createElement('div'); h.style.fontWeight='700'; h.style.fontSize='15px'; h.style.textAlign='center'; h.style.color=wi===0?'#ef4444':(wi===6?'#2563eb':'#64748b'); h.style.padding='4px 0'; h.textContent=w; grid.appendChild(h); });
+    for(let i=0;i<firstDay;i++) grid.appendChild(document.createElement('div'));
+    const todayStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+    for(let d=1; d<=daysInMonth; d++){
+      const cell=document.createElement('div'); cell.className='cal-cell';
+      const dateStr=state.year+'-'+String(state.month+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      cell.dataset.date=dateStr;
+      const dow=new Date(state.year,state.month,d).getDay();
+      const holidayName=getHolidayName(state.year,state.month,d);
+      if(holidayName) cell.classList.add('cal-holiday');
+      if(dateStr===todayStr) cell.classList.add('cal-today');
+      if(lastFocusedGridId===gridId && lastFocusedCellDate===dateStr) cell.classList.add('cal-focused');
+      const dateColor=holidayName?'#dc2626':(dow===0?'#ef4444':(dow===6?'#2563eb':'#334155'));
+      let dateHTML='<div class="cal-date-head"><div class="date-num" style="color:'+dateColor+';">'+d+(dateStr===todayStr?' <span class="today-badge">오늘</span>':'')+'</div><button type="button" class="cal-add-btn" aria-label="'+d+'일 일정 추가" onclick="event.stopPropagation();openCalendarAddModal(\''+storeKeyName+'\',\''+dateStr+'\')">+</button></div>';
+      if(holidayName) dateHTML+='<div class="holiday-badge">🎉 '+holidayName+'</div>';
+      cell.innerHTML=dateHTML;
+      Object.entries(store).filter(([siteName])=>sites.some(s=>s.name===siteName)).forEach(([siteName,dateArr])=>{
+        const visibleDates = storeKeyName==='contact' ? (dateArr||[]).filter(isVisibleContactDate) : (dateArr||[]);
+        visibleDates.forEach(savedDate=>{
+          if(savedDate!==dateStr) return;
+          const ev=document.createElement('div');
+          ev.className='cal-event '+(eventClass||'');
+          const style=getCalendarEventStyle(siteName);
+          ev.style.background=style.background;
+          ev.style.color=style.text;
+          ev.innerHTML='<span class="cal-event-name">'+escapeHtml(siteName)+'</span><span class="cal-event-sub">'+escapeHtml(getLatestVisitDisplay(siteName))+'</span>';
+          ev.title=siteName+' · '+getLatestVisitDisplay(siteName); ev.draggable=true;
+          const key=eventKey(storeKeyName,siteName,dateStr);
+          if(selectedEvents.some(se=>se.key===key)) ev.classList.add('selected');
+          ev.addEventListener('click',e=>{
+            e.stopPropagation();
+            if(e.ctrlKey||e.metaKey){ const idx=selectedEvents.findIndex(se=>se.key===key); if(idx>=0){ selectedEvents.splice(idx,1); ev.classList.remove('selected'); } else { selectedEvents.push({key,store:storeKeyName,site:siteName,date:dateStr}); ev.classList.add('selected'); } }
+            else if(selectedEvents.length===1 && selectedEvents[0].key===key){ clearSelection(); }
+            else { clearSelection(); selectedEvents.push({key,store:storeKeyName,site:siteName,date:dateStr}); ev.classList.add('selected'); }
+            updateSelectionBar();
+          });
+          ev.addEventListener('dblclick',e=>{ e.stopPropagation(); openDetailByName(siteName); });
+          ev.addEventListener('contextmenu',e=>showContextMenu(e,siteName,storeKeyName,dateStr));
+          ev.addEventListener('dragstart',e=>{
+            e.stopPropagation();
+            const isCopy=e.ctrlKey||e.metaKey;
+            const key2=eventKey(storeKeyName,siteName,dateStr);
+            let payloadEvents=selectedEvents.some(se=>se.key===key2)?selectedEvents.slice():[{key:key2,store:storeKeyName,site:siteName,date:dateStr}];
+            e.dataTransfer.setData('text/plain',JSON.stringify({mode:isCopy?'copy':'move',events:payloadEvents}));
+          });
+          cell.appendChild(ev);
+        });
+      });
+      cell.addEventListener('click',(e)=>{
+        if(selectedSideCard && (e.target===cell || e.target.classList.contains('date-num') || e.target.classList.contains('holiday-badge'))){ insertSelectedSideCardToDate(dateStr); return; }
+        if(selectedEvents.length>0 && (e.target===cell || e.target.classList.contains('date-num') || e.target.classList.contains('holiday-badge'))){ moveSelectedEventsToDate(dateStr); return; }
+        if(e.target===cell || e.target.classList.contains('date-num')) clearSelection();
+        lastFocusedCellDate=dateStr; lastFocusedGridId=gridId; refreshCalendars();
+      });
+      cell.addEventListener('dragover',e=>{ e.preventDefault(); cell.classList.add('drag-over'); });
+      cell.addEventListener('dragleave',()=>cell.classList.remove('drag-over'));
+      cell.addEventListener('drop',async e=>{
+        e.preventDefault(); cell.classList.remove('drag-over');
+        let data = null;
+        try{ data=JSON.parse(e.dataTransfer.getData('text/plain')); }catch(err){ data=selectedSideCard; }
+        if(!data && selectedSideCard) data=selectedSideCard;
+        if(!data) return;
+        if(data.mode==='new'){ await addSiteScheduleWithSync(data.site, data.store, dateStr); setSelectedSideCard(null, null); return; }
+        if(data.mode==='copy'){
+          const undo=[];
+          for(const ev of (data.events||[])){
+            const added = addDateToStoreLocal(ev.store, ev.site, dateStr);
+            if(added){ undo.push({kind:'add', store:ev.store, site:ev.site, date:dateStr}); persistCalendarStores(); await syncAddDate(ev.store, ev.site, dateStr); }
+          }
+          if(undo.length) pushUndoCalendar({ title:'일정 복사', changes:undo });
+          clearSelection(); refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
+          return;
+        }
+        const undo=[];
+        (data.events||[]).forEach(ev=>{
+          const st=ev.store==='visit'?visitStore:contactStore; const arr=st[ev.site]||[]; const idx=arr.indexOf(ev.date); if(idx>=0) arr.splice(idx,1); if(!arr.includes(dateStr)) arr.push(dateStr); st[ev.site]=arr; if(ev.date!==dateStr) undo.push({kind:'move', store:ev.store, site:ev.site, from:ev.date, to:dateStr}); persistCalendarStores();
+        });
+        clearSelection(); refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
+        for(const change of undo){ await syncMoveDate(change.store, change.site, change.from, change.to); }
+        if(undo.length) pushUndoCalendar({ title:'일정 이동', changes:undo });
+      });
+      grid.appendChild(cell);
+    }
+  };
+  deleteCalendarEvent = async function(siteName,storeType,dateStr){
+    const store = storeType==='visit'?visitStore:contactStore;
+    const datesToDelete = dateStr ? [dateStr] : ((store[siteName]||[]).slice());
+    const visibleDatesToDelete = storeType==='contact' ? datesToDelete.filter(isVisibleContactDate) : datesToDelete;
+    const undo = [];
+    visibleDatesToDelete.forEach(date=>{ if(removeDateFromStore(storeType, siteName, date)) undo.push({kind:'delete', store:storeType, site:siteName, date}); });
+    persistCalendarStores(); clearSelection(); refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
+    for(const change of undo){ await syncDeleteDate(change.store, change.site, change.date); }
+    if(undo.length) pushUndoCalendar({ title:'일정 삭제', changes:undo });
+  };
+  moveSelectedEventsToDate = async function(dateStr){
+    const events=selectedEvents.slice();
+    if(!events.length || !dateStr) return;
+    const undo=[];
+    events.forEach(ev=>{
+      const st=ev.store==='visit'?visitStore:contactStore; const arr=st[ev.site]||[]; const idx=arr.indexOf(ev.date); if(idx>=0) arr.splice(idx,1); if(!arr.includes(dateStr)) arr.push(dateStr); st[ev.site]=arr; if(ev.date!==dateStr) undo.push({kind:'move', store:ev.store, site:ev.site, from:ev.date, to:dateStr});
+    });
+    persistCalendarStores(); clearSelection(); refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
+    for(const change of undo){ await syncMoveDate(change.store, change.site, change.from, change.to); }
+    if(undo.length){ pushUndoCalendar({ title:'일정 이동', changes:undo }); showSyncBanner('✅ '+events.length+'건 일정을 '+dateStr+'로 이동했습니다.', '#16a34a'); }
+  };
+  bulkDeleteSelectedEvents = async function(){
+    const events=selectedEvents.slice();
+    if(!events.length) return;
+    const undo=[];
+    events.forEach(ev=>{ if(removeDateFromStore(ev.store, ev.site, ev.date)) undo.push({kind:'delete', store:ev.store, site:ev.site, date:ev.date}); });
+    persistCalendarStores(); clearSelection(); refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
+    for(const change of undo){ await syncDeleteDate(change.store, change.site, change.date); }
+    if(undo.length){ pushUndoCalendar({ title:'일정 일괄삭제', changes:undo }); showSyncBanner('🗑 '+undo.length+'건 삭제 완료', '#ef4444'); }
+  };
+  const originalAddSiteScheduleWithSync = addSiteScheduleWithSync;
+  addSiteScheduleWithSync = async function(siteName, storeType, dateStr, options = {}){
+    const beforeVisit = JSON.stringify(visitStore[siteName] || []);
+    const beforeContact = JSON.stringify(contactStore[siteName] || []);
+    await originalAddSiteScheduleWithSync(siteName, storeType, dateStr, options);
+    const afterVisit = JSON.stringify(visitStore[siteName] || []);
+    const afterContact = JSON.stringify(contactStore[siteName] || []);
+    const changes = [];
+    if(beforeVisit !== afterVisit){
+      const before = new Set(JSON.parse(beforeVisit)); const after = JSON.parse(afterVisit);
+      after.forEach(date=>{ if(!before.has(date)) changes.push({kind:'add', store:'visit', site:siteName, date}); });
+    }
+    if(beforeContact !== afterContact){
+      const before = new Set(JSON.parse(beforeContact)); const after = JSON.parse(afterContact);
+      after.forEach(date=>{ if(!before.has(date)) changes.push({kind:'add', store:'contact', site:siteName, date}); });
+    }
+    if(changes.length) pushUndoCalendar({ title:'일정 추가', changes });
+  };
+  insertSelectedSideCardToDate = async function(dateStr){ if(!selectedSideCard || !dateStr) return; await addSiteScheduleWithSync(selectedSideCard.site, selectedSideCard.store, dateStr); setSelectedSideCard(null, null); };
+  openDetailByName = function(name){
+    const site = getSiteByName(name);
+    if(!site) return;
+    currentDetailSiteName = site.name;
+    ensureDetailAuxBlocks();
+    const titleEl = document.getElementById('detail-title');
+    titleEl.innerHTML = '<div class="detail-title-edit"><input id="detail-title-input" class="detail-edit-input" value="' + escapeAttr(site.name || '') + '"><span class="detail-live-badge">실시간 수정 · 노션 즉시 반영</span></div>';
+    renderDetailEditableField('detail-manager-company', 'detail-company-input', 'text', site.company || '', '<button type="button" class="detail-inline-link-btn" onclick="openCompanyFromDetail()">회사 카드 열기</button>');
+    renderDetailEditableField('detail-manager-site', 'detail-site-input-top', 'text', site.site || site.region || '');
+    renderDetailEditableField('detail-manager-name', 'detail-manager-name-input', 'text', site.managerName || '');
+    renderDetailEditableField('detail-manager-contact', 'detail-manager-contact-input', 'text', site.contact || '', normalizePhone(site.contact) ? '<div class="detail-inline-help"><a class="detail-call-link" href="tel:' + normalizePhone(site.contact) + '">전화 걸기</a></div>' : '<div class="detail-inline-help">전화번호를 입력하면 모바일에서 바로 연결할 수 있습니다.</div>');
+    renderDetailSummaryBoxes(site);
+    renderDetailEditableField('detail-contract-date', 'detail-contract-date-input', 'date', site.contractDate || '');
+    renderDetailEditableField('detail-start-date', 'detail-start-date-input', 'date', site.start || '');
+    renderDetailEditableField('detail-end-date', 'detail-end-date-input', 'date', site.end || '');
+    renderDetailEditableField('detail-amount', 'detail-amount-input', 'text', Number(site.amount || 0).toLocaleString('ko-KR'));
+    const siteLowerItem = document.getElementById('detail-site')?.closest('.item');
+    if(siteLowerItem) siteLowerItem.style.display = 'none';
+    renderDetailEditableField('detail-mgmt-no', 'detail-mgmt-no-input', 'text', site.mgmtNo || '');
+    renderDetailEditableField('detail-biz-open-no', 'detail-biz-open-no-input', 'text', site.bizOpenNo || '');
+    renderDetailEditableField('detail-biz-mgmt-no', 'detail-biz-mgmt-no-input', 'text', site.bizMgmtNo || '');
+    document.getElementById('detail-company').textContent = site.company || '-';
+    const noteWrap = document.getElementById('detail-note-wrap');
+    noteWrap.innerHTML = '<div class="detail-note editable"><div style="font-size:13px;font-weight:800;margin-bottom:2px;">비고</div><div style="font-size:12px;opacity:0.9;">수정 후 포커스를 벗어나면 자동 저장됩니다.</div><textarea id="detail-note-input" class="detail-edit-textarea">' + escapeHtml(site.note || '') + '</textarea></div>';
+    renderPhotoSection(site);
+    renderDetailScheduleEditor(site);
+    const statusRow = document.getElementById('detail-site-input-top')?.closest('.mgr-item');
+    if(statusRow){
+      let block = document.getElementById('detail-status-block');
+      if(!block){ block = document.createElement('div'); block.id = 'detail-status-block'; block.className = 'detail-meta-hint'; statusRow.appendChild(block); }
+      block.innerHTML = '<div style="font-size:12px;color:#4338ca;font-weight:700;margin-bottom:6px;">상태</div><input id="detail-status-inline" class="detail-edit-input" value="' + escapeAttr(site.status || '') + '" placeholder="예: 진행중, 공사완료">';
+    }
+    bindDetailRealtimeInput('detail-title-input', 'name', value => String(value || '').trim());
+    bindDetailRealtimeInput('detail-company-input', 'company', value => String(value || '').trim());
+    bindDetailRealtimeInput('detail-site-input-top', 'site', value => String(value || '').trim());
+    bindDetailRealtimeInput('detail-manager-name-input', 'managerName', value => String(value || '').trim());
+    bindDetailRealtimeInput('detail-manager-contact-input', 'contact', value => String(value || '').trim());
+    bindDetailRealtimeInput('detail-contract-date-input', 'contractDate', value => value || null);
+    bindDetailRealtimeInput('detail-start-date-input', 'start', value => value || null);
+    bindDetailRealtimeInput('detail-end-date-input', 'end', value => value || null);
+    bindDetailRealtimeInput('detail-amount-input', 'amount', value => String(value || '').replace(/,/g,''));
+    bindDetailRealtimeInput('detail-mgmt-no-input', 'mgmtNo', value => String(value || '').trim());
+    bindDetailRealtimeInput('detail-biz-open-no-input', 'bizOpenNo', value => String(value || '').trim());
+    bindDetailRealtimeInput('detail-biz-mgmt-no-input', 'bizMgmtNo', value => String(value || '').trim());
+    bindDetailRealtimeInput('detail-note-input', 'note', value => String(value || ''));
+    bindDetailRealtimeInput('detail-status-inline', 'status', value => String(value || '').trim());
+    const amountInput = document.getElementById('detail-amount-input');
+    if(amountInput){
+      amountInput.addEventListener('blur', ()=>{ const digits = String(amountInput.value || '').replace(/[^0-9.-]/g,''); amountInput.value = digits ? Number(digits).toLocaleString('ko-KR') : ''; });
+      amountInput.addEventListener('focus', ()=>{ amountInput.value = String(amountInput.value || '').replace(/,/g,''); });
+    }
+    showModalFront('detail-modal');
+  };
+  renderCompanyCards = function(){
+    const grid = document.getElementById('companies-grid');
+    if(!grid) return;
+    const q = (document.getElementById('companies-search')?.value || '').trim().toLowerCase();
+    const activeSiteNames = new Set(getDashboardSites().map(site => site.name));
+    const list = (companies || []).map(company => ({ ...company, contracts:(company.contracts||[]).filter(contract => activeSiteNames.has(contract.name)), contractCount:(company.contracts||[]).filter(contract => activeSiteNames.has(contract.name)).length })).filter(company => company.contractCount > 0).filter(company => {
+      const hay = [company.displayName, company.name, company.responsible, company.representativeName, ...(company.people||[]).flatMap(person => [person.name, person.phone]), ...(company.contracts||[]).map(contract => contract.name)].join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+    grid.innerHTML = list.length ? list.map(companyCardHtml).join('') : '<div class="company-empty">표시할 회사 카드가 없습니다.</div>';
+  };
+  document.addEventListener('keydown', (e) => {
+    const isMeta = e.ctrlKey || e.metaKey;
+    if(isMeta && (e.key === 'z' || e.key === 'Z')){ e.preventDefault(); undoLastCalendarAction(); }
+  });
+  updateUndoButton();
 
   registerModalStacking();
   setupMobileSideToggles();
