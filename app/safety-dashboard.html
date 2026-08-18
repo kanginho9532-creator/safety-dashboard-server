@@ -452,6 +452,9 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
   .undo-calendar-btn{right:12px;bottom:calc(80px + env(safe-area-inset-bottom));}
 }
 
+
+.drag-card-contact{display:block;font-size:11px;color:#b45309;margin-top:3px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
 </style>
 </head>
 <body>
@@ -2907,8 +2910,8 @@ document.addEventListener('DOMContentLoaded', () => {
     else el.innerHTML = '<input id="' + inputId + '" class="detail-edit-input" type="' + type + '" value="' + escapeAttr(value || '') + '">' + extra;
   }
   function renderDetailSummaryBoxes(site){
-    const vdates = (visitStore[site.name] || []).slice().sort();
-    const cdates = (contactStore[site.name] || []).slice().sort();
+    const vdates = visibleDatesForStore('visit', site.name);
+    const cdates = getVisibleContactDates(site.name);
     document.getElementById('detail-contact-date').innerHTML = '<div>' + (cdates.length ? fmtDateDot(cdates[cdates.length-1]) : '-') + '</div><div class="detail-inline-help">연락요청 날짜는 연락요청 캘린더에서 수정됩니다.</div>';
     document.getElementById('detail-visit-date').innerHTML = '<div>' + (vdates.length ? fmtDateDot(vdates[vdates.length-1]) : '-') + '</div><div class="detail-inline-help">방문 날짜는 방문 캘린더에서 수정됩니다.</div>';
     const target = site.targetVisits || 2;
@@ -3691,9 +3694,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const bindCard = (el,payload)=>{ el.addEventListener('click',e=>{ e.stopPropagation(); setSelectedSideCard(payload, el); }); el.addEventListener('dragstart',e=>{ setSelectedSideCard(payload, el); e.dataTransfer.effectAllowed='copyMove'; e.dataTransfer.setData('text/plain',JSON.stringify(payload)); }); el.addEventListener('dblclick',()=>openDetailByName(payload.site)); el.addEventListener('contextmenu',e=>showContextMenu(e,payload.site,payload.store,'')); };
     const primaryList = storeType === 'contact' ? getContactPendingThisMonth() : getUnvisitedThisMonth();
     const secondaryList = storeType === 'contact' ? getContactNeverRequested() : getNeverVisited();
-    primaryList.forEach(site=>{ const payload={mode:'new',site:site.name,store:storeType}; const el=document.createElement('div'); el.className='drag-card'; el.draggable=true; el.style.borderLeft='4px solid '+siteColor(site.name); el.dataset.siteName=site.name; el.title=site.name+' · '+site.company; el.innerHTML='<span class="drag-card-text">'+escapeHtml(site.name)+' · '+escapeHtml(site.company||'-')+'</span>'+noteFlag(site); bindCard(el,payload); cUn.appendChild(el); });
+    primaryList.forEach(site=>{ const payload={mode:'new',site:site.name,store:storeType}; const el=document.createElement('div'); el.className='drag-card'; el.draggable=true; el.style.borderLeft='4px solid '+siteColor(site.name); el.dataset.siteName=site.name; el.title=site.name+' · '+site.company; el.innerHTML='<span class="drag-card-text">'+escapeHtml(site.name)+' · '+escapeHtml(site.company||'-')+'</span>'+getContactDateLabelForCard(site)+noteFlag(site); bindCard(el,payload); cUn.appendChild(el); });
     if(!cUn.children.length) cUn.innerHTML='<div class="side-empty">표시할 현장이 없습니다.</div>';
-    secondaryList.forEach(site=>{ const payload={mode:'new',site:site.name,store:storeType}; const el=document.createElement('div'); el.className='drag-card never'; el.draggable=true; el.style.borderLeft='4px solid '+siteColor(site.name); el.dataset.siteName=site.name; el.title=site.name+' · '+site.company; el.innerHTML='<span class="drag-card-text">'+escapeHtml(site.name)+' · '+escapeHtml(site.company||'-')+'</span>'+noteFlag(site); bindCard(el,payload); cNev.appendChild(el); });
+    secondaryList.forEach(site=>{ const payload={mode:'new',site:site.name,store:storeType}; const el=document.createElement('div'); el.className='drag-card never'; el.draggable=true; el.style.borderLeft='4px solid '+siteColor(site.name); el.dataset.siteName=site.name; el.title=site.name+' · '+site.company; el.innerHTML='<span class="drag-card-text">'+escapeHtml(site.name)+' · '+escapeHtml(site.company||'-')+'</span>'+getContactDateLabelForCard(site)+noteFlag(site); bindCard(el,payload); cNev.appendChild(el); });
     if(!cNev.children.length) cNev.innerHTML='<div class="side-empty">표시할 현장이 없습니다.</div>';
     filterCalSiteList(); filterCalSiteList2();
   };
@@ -3935,13 +3938,30 @@ document.addEventListener('DOMContentLoaded', () => {
   const ACTIVE_SCHEDULE_MONTH_END_STR = curYear + '-' + String(curMonth + 1).padStart(2, '0') + '-' + String(ACTIVE_SCHEDULE_MONTH_END.getDate()).padStart(2, '0');
   function isVisibleScheduleDate(dateStr){
     if(!dateStr) return false;
-    return String(dateStr) <= ACTIVE_SCHEDULE_MONTH_END_STR;
+    const s = String(dateStr).trim();
+    let m = s.match(/^(\d{4})[-/.]?(\d{1,2})[-/.]?(\d{1,2})/);
+    let key;
+    if(m){
+      key = m[1] + '-' + String(+m[2]).padStart(2,'0') + '-' + String(+m[3]).padStart(2,'0');
+    } else {
+      m = s.match(/^(\d{1,2})[-/.]?(\d{1,2})/);
+      if(!m) return false;
+      key = curYear + '-' + String(+m[1]).padStart(2,'0') + '-' + String(+m[2]).padStart(2,'0');
+    }
+    return key <= ACTIVE_SCHEDULE_MONTH_END_STR;
   }
   function visibleDatesForStore(storeType, siteName){
     return ((storeType === 'visit' ? visitStore[siteName] : contactStore[siteName]) || []).filter(isVisibleScheduleDate).slice().sort();
   }
   isVisibleContactDate = function(dateStr){ return isVisibleScheduleDate(dateStr); };
   getVisibleContactDates = function(siteName){ return visibleDatesForStore('contact', siteName); };
+  function getContactDateLabelForCard(site){
+    if(!site) return '';
+    const visible = getVisibleContactDates(site.name);
+    if(!visible.length) return '';
+    const latest = visible[visible.length - 1];
+    return '<span class="drag-card-contact">연락요청 ' + fmtDateDot(latest).slice(5) + '</span>';
+  }
 
   registerModalStacking();
   setupMobileSideToggles();
