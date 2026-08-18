@@ -446,6 +446,12 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
   .detail-photo-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 
+
+.undo-calendar-btn.disabled{opacity:.45;pointer-events:none;}
+@media (max-width:800px){
+  .undo-calendar-btn{right:12px;bottom:calc(80px + env(safe-area-inset-bottom));}
+}
+
 </style>
 </head>
 <body>
@@ -2370,7 +2376,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const q = (document.getElementById('stats-search').value || '').trim().toLowerCase();
     const tbody = document.getElementById('stat-tbody');
     if(!tbody) return;
-    const filtered = getUniqueSites().filter(site => [site.name, site.company].join(' ').toLowerCase().includes(q));
+    const filtered = getDashboardSites().filter(site => [site.name, site.company].join(' ').toLowerCase().includes(q));
     const sorted = applySortMode(filtered);
     tbody.innerHTML = sorted.map(site => {
       const noteHtml = site.note ? '<span class="note-flag" title="' + escapeHtml(site.note) + '">!</span>' : '';
@@ -2715,7 +2721,14 @@ document.addEventListener('DOMContentLoaded', () => {
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
+      const rawText = await res.text();
+      let data = null;
+      try{ data = rawText ? JSON.parse(rawText) : null; }catch(e){ data = null; }
+      if(!res.ok || !data || data.ok !== true){
+        const isHtml = /^\s*</.test(rawText || '');
+        const detail = isHtml ? ('서버가 HTML 응답을 반환했습니다(HTTP ' + res.status + '). 서버(index.js)를 최신 파일로 재시작/재배포해주세요.') : (data && data.error ? data.error : ('HTTP ' + res.status + ' ' + String(rawText || '').slice(0,120)));
+        throw new Error(detail);
+      }
       if(data.ok){
         showSyncBanner('✅ 회사 카드 저장 완료: ' + (payload.companyDisplayName || payload.companyName), '#16a34a');
         await loadFromNotion();
@@ -2828,8 +2841,14 @@ document.addEventListener('DOMContentLoaded', () => {
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
-    if(!data.ok) throw new Error(data.error || 'update failed');
+    const rawText = await res.text();
+    let data = null;
+    try{ data = rawText ? JSON.parse(rawText) : null; }catch(e){ data = null; }
+    if(!res.ok || !data || data.ok !== true){
+      const isHtml = /^\s*</.test(rawText || '');
+      const detail = isHtml ? ('서버가 HTML 응답을 반환했습니다(HTTP ' + res.status + '). 서버(index.js)를 최신 파일로 재시작/재배포해주세요.') : (data && data.error ? data.error : ('HTTP ' + res.status + ' ' + String(rawText || '').slice(0,120)));
+      throw new Error(detail);
+    }
     showSyncBanner('✅ 노션 실시간 저장 완료: ' + siteName, '#16a34a');
     scheduleNotionRefresh();
     return true;
@@ -3444,8 +3463,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function updateUndoButton(){
     const btn = createUndoButton();
-    btn.classList.toggle('show', undoCalendarStack.length > 0);
-    btn.innerHTML = '↶ 돌아가기' + (undoCalendarStack.length ? ' (' + undoCalendarStack.length + ')' : '');
+    btn.classList.add('show');
+    const has = undoCalendarStack.length > 0;
+    btn.classList.toggle('disabled', !has);
+    btn.disabled = !has;
+    btn.title = has ? '마지막 일정 작업 되돌리기 (Ctrl+Z)' : '되돌릴 작업이 없습니다';
+    btn.innerHTML = '↶ 돌아가기' + (has ? ' (' + undoCalendarStack.length + ')' : '');
   }
   function pushUndoCalendar(entry){
     if(!entry || !entry.changes || !entry.changes.length) return;
@@ -3607,7 +3630,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderDetailScheduleEditor(site){
     const wrap = document.getElementById('detail-schedule-editor');
     if(!wrap) return;
-    const visitDates = (visitStore[site.name] || []).slice().sort().reverse();
+    const visitDates = visibleDatesForStore('visit', site.name).slice().reverse();
     const contactDates = getVisibleContactDates(site.name).slice().reverse();
     wrap.innerHTML = renderScheduleColumn('contact', site.name, contactDates, '연락요청일자') + renderScheduleColumn('visit', site.name, visitDates, '방문일자');
   }
@@ -3679,7 +3702,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(!rail||!focusEl||!countEl||!summary) return;
     const focusDate=getCalendarFocusDate(gridId,state); const focus=new Date(focusDate+'T00:00:00');
     const days=['일','월','화','수','목','금','토']; const isToday=focusDate===calendarDateString(now); const dayEvents=[];
-    Object.entries(store).forEach(([site,dateArr])=>{ const visibleDates = gridId==='cal-grid-contact' ? (dateArr||[]).filter(isVisibleContactDate) : (dateArr||[]); if(visibleDates.includes(focusDate)) dayEvents.push(site); });
+    Object.entries(store).forEach(([site,dateArr])=>{ const visibleDates = (dateArr||[]).filter(isVisibleScheduleDate); if(visibleDates.includes(focusDate)) dayEvents.push(site); });
     focusEl.textContent=(focus.getMonth()+1)+'월 '+focus.getDate()+'일 · '+days[focus.getDay()] + (isToday?' · 오늘':'');
     countEl.textContent=dayEvents.length+'건'; rail.innerHTML='';
     for(let offset=-3;offset<=3;offset++){
@@ -3720,7 +3743,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if(holidayName) dateHTML+='<div class="holiday-badge">🎉 '+holidayName+'</div>';
       cell.innerHTML=dateHTML;
       Object.entries(store).filter(([siteName])=>sites.some(s=>s.name===siteName)).forEach(([siteName,dateArr])=>{
-        const visibleDates = storeKeyName==='contact' ? (dateArr||[]).filter(isVisibleContactDate) : (dateArr||[]);
+        const visibleDates = (dateArr||[]).filter(isVisibleScheduleDate);
         visibleDates.forEach(savedDate=>{
           if(savedDate!==dateStr) return;
           const ev=document.createElement('div');
@@ -3790,7 +3813,7 @@ document.addEventListener('DOMContentLoaded', () => {
   deleteCalendarEvent = async function(siteName,storeType,dateStr){
     const store = storeType==='visit'?visitStore:contactStore;
     const datesToDelete = dateStr ? [dateStr] : ((store[siteName]||[]).slice());
-    const visibleDatesToDelete = storeType==='contact' ? datesToDelete.filter(isVisibleContactDate) : datesToDelete;
+    const visibleDatesToDelete = datesToDelete.filter(isVisibleScheduleDate);
     const undo = [];
     visibleDatesToDelete.forEach(date=>{ if(removeDateFromStore(storeType, siteName, date)) undo.push({kind:'delete', store:storeType, site:siteName, date}); });
     persistCalendarStores(); clearSelection(); refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
@@ -3905,6 +3928,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if(isMeta && (e.key === 'z' || e.key === 'Z')){ e.preventDefault(); undoLastCalendarAction(); }
   });
   updateUndoButton();
+
+
+  // ==== 0818 공용 일정 표시 조건 (연락요청·방문 동일) ====
+  const ACTIVE_SCHEDULE_MONTH_END = new Date(curYear, curMonth + 1, 0);
+  const ACTIVE_SCHEDULE_MONTH_END_STR = curYear + '-' + String(curMonth + 1).padStart(2, '0') + '-' + String(ACTIVE_SCHEDULE_MONTH_END.getDate()).padStart(2, '0');
+  function isVisibleScheduleDate(dateStr){
+    if(!dateStr) return false;
+    return String(dateStr) <= ACTIVE_SCHEDULE_MONTH_END_STR;
+  }
+  function visibleDatesForStore(storeType, siteName){
+    return ((storeType === 'visit' ? visitStore[siteName] : contactStore[siteName]) || []).filter(isVisibleScheduleDate).slice().sort();
+  }
+  isVisibleContactDate = function(dateStr){ return isVisibleScheduleDate(dateStr); };
+  getVisibleContactDates = function(siteName){ return visibleDatesForStore('contact', siteName); };
 
   registerModalStacking();
   setupMobileSideToggles();
