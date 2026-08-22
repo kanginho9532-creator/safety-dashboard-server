@@ -91,6 +91,8 @@ table.stat tbody tr:nth-child(even){background:#f8fafc;}
 .cal-cell{min-height:100px;max-height:220px;border:1.5px solid #cbd5e1;border-radius:8px;padding:6px;font-size:14px;position:relative;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,0.03);min-width:0;overflow-y:auto;overflow-x:hidden;box-sizing:border-box;}
 .cal-cell.drag-over{background:#dbeafe;border-color:var(--blue);}
 .cal-cell.cal-today{background:#fffbea;border:2px solid #f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,0.15);}
+.cal-cell.cal-flash{animation:calFlash 1.2s ease-out 1;}
+@keyframes calFlash{0%{box-shadow:0 0 0 0 rgba(245,158,11,.6);}100%{box-shadow:0 0 0 0 rgba(245,158,11,0);}}
 .cal-cell.cal-focused{outline:2px solid #16a34a;}
 .cal-cell .date-num{font-weight:700;font-size:16px;}
 .cal-cell.cal-holiday{background:#fff5f5;border-color:#fecaca;}
@@ -915,6 +917,29 @@ function activateDashboardPage(pageId,updateUrl){
   if(title) title.textContent=MOBILE_PAGE_TITLES[pageId]||'대시보드';
   document.querySelector('.sidebar')?.classList.remove('open');
   if(updateUrl){ const url=new URL(window.location.href); url.searchParams.set('page',pageId); window.history.replaceState({},'',url); window.scrollTo({top:0,behavior:'smooth'}); }
+  if(pageId === 'calendar' || pageId === 'contact-calendar'){
+    try{
+      if(pageId === 'calendar'){ calState = {year:curYear, month:curMonth}; }
+      else { calStateContact = {year:curYear, month:curMonth}; }
+      lastFocusedCellDate = null;
+      lastFocusedGridId = null;
+      refreshCalendars();
+      setTimeout(()=>{
+        const gridId = pageId === 'calendar' ? 'cal-grid' : 'cal-grid-contact';
+        const grid = document.getElementById(gridId);
+        if(!grid) return;
+        const todayStr = curYear + '-' + String(curMonth + 1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+        const todayCell = grid.querySelector('.cal-cell[data-date="'+todayStr+'"]');
+        if(todayCell){
+          todayCell.scrollIntoView({block:'center', behavior:'smooth'});
+          todayCell.classList.add('cal-flash');
+          setTimeout(()=>todayCell.classList.remove('cal-flash'), 1200);
+        }
+        const calPage = document.getElementById(pageId);
+        if(calPage) calPage.scrollTop = 0;
+      }, 150);
+    }catch(e){ console.warn('calendar focus error:', e); }
+  }
 }
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -3951,10 +3976,10 @@ document.addEventListener('DOMContentLoaded', () => {
     return key <= ACTIVE_SCHEDULE_MONTH_END_STR;
   }
   function visibleDatesForStore(storeType, siteName){
-    return ((storeType === 'visit' ? visitStore[siteName] : contactStore[siteName]) || []).filter(isVisibleScheduleDate).slice().sort();
+    return ((storeType === 'visit' ? visitStore[siteName] : contactStore[siteName]) || []).slice().sort();
   }
-  isVisibleContactDate = function(dateStr){ return isVisibleScheduleDate(dateStr); };
-  getVisibleContactDates = function(siteName){ return visibleDatesForStore('contact', siteName); };
+  isVisibleContactDate = function(dateStr){ return !!dateStr; };
+  getVisibleContactDates = function(siteName){ return (contactStore[siteName] || []).slice().sort(); };
   function getContactDateLabelForCard(site){
     if(!site) return '';
     const visible = getVisibleContactDates(site.name);
