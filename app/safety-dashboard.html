@@ -99,7 +99,7 @@ table.stat tbody tr:nth-child(even){background:#f8fafc;}
 .cal-cell.cal-holiday .date-num{color:#dc2626 !important;}
 .holiday-badge{display:inline-block;background:#fef2f2;color:#dc2626;font-size:10px;font-weight:800;padding:1px 6px;border-radius:4px;border:1.5px solid #fecaca;margin-top:2px;letter-spacing:0.3px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;}
 .today-badge{background:#f59e0b;color:white;font-size:11px;font-weight:700;padding:2px 6px;border-radius:8px;margin-left:4px;vertical-align:middle;}
-.cal-event{background:var(--blue);color:white;border-radius:6px;padding:5px 7px;font-size:14px;font-weight:800;margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:grab;user-select:none;max-width:100%;box-sizing:border-box;display:block;line-height:1.35;}.cal-event-company{padding:0;white-space:normal;}.cal-event-company-header{padding:5px 7px;display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12.5px;}.cal-event-company-header::after{content:'▾';font-size:10px;opacity:.85;}.cal-event-company.expanded .cal-event-company-header::after{content:'▴';}.cal-event-children{padding:0 6px 6px 6px;display:flex;flex-direction:column;gap:3px;}.cal-event-child{font-size:11.5px;padding:3px 6px;border-radius:5px;margin-top:0;}.cal-group-toggle{appearance:none;border:1px solid #dce7e4;background:#fff;color:#057a75;border-radius:8px;padding:4px 9px;font-size:11px;font-weight:800;cursor:pointer;}.cal-group-toggle.off{background:#f1f5f9;color:#475569;}
+.cal-event{background:var(--blue);color:white;border-radius:6px;padding:5px 7px;font-size:14px;font-weight:800;margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:grab;user-select:none;max-width:100%;box-sizing:border-box;display:block;line-height:1.35;}
 .cal-cell .date-num{font-weight:800;font-size:17px;}
 .side-search{width:100%;box-sizing:border-box;padding:8px 10px;margin:4px 0 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;}
 .side-section{margin-bottom:14px;}
@@ -597,9 +597,8 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 	            <button onclick="changeMonth(-1)">◀</button>
 	            <strong id="cal-month-label"></strong>
 	            <button onclick="changeMonth(1)">▶</button>
-	            <button type="button" class="cal-group-toggle" data-grid="cal-grid" onclick="toggleCalendarCompanyView('cal-grid', this)">업체 묶음 ON</button>
 	          </div>
-
+	          
 	          <div class="cal-grid" id="cal-grid"></div>
 	        </div>
 	        <section class="calendar-workbench" aria-label="선택 날짜 방문 일정">
@@ -630,9 +629,8 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 	            <button onclick="changeMonthContact(-1)">◀</button>
 	            <strong id="cal-month-label-contact"></strong>
 	            <button onclick="changeMonthContact(1)">▶</button>
-	            <button type="button" class="cal-group-toggle" data-grid="cal-grid-contact" onclick="toggleCalendarCompanyView('cal-grid-contact', this)">업체 묶음 ON</button>
 	          </div>
-
+	          
 	          <div class="cal-grid" id="cal-grid-contact"></div>
 	        </div>
 	        <section class="calendar-workbench" aria-label="선택 날짜 연락 요청">
@@ -965,12 +963,8 @@ function refreshKPIs(){ document.getElementById('kpi-total').textContent=sites.l
 
 const SITE_COLOR_PALETTE = ['#2563eb','#dc2626','#16a34a','#9333ea','#ea580c','#0891b2','#db2777','#65a30d','#7c3aed','#0d9488','#c026d3','#4b5563'];
 const siteColorMap = {};
-const companyColorMap = {};
 sites.forEach((s,i)=>{ siteColorMap[s.name] = SITE_COLOR_PALETTE[i % SITE_COLOR_PALETTE.length]; });
-sites.forEach((s,i)=>{ const k = (s.company || s.name || '').trim(); if(k && !companyColorMap[k]) companyColorMap[k] = SITE_COLOR_PALETTE[i % SITE_COLOR_PALETTE.length]; });
 function siteColor(name){ return siteColorMap[name] || '#2563eb'; }
-function companyColor(name){ return companyColorMap[name] || '#2563eb'; }
-window.__calCompanyExpanded = window.__calCompanyExpanded || {};
 function noteFlag(s){ return s.note ? '<span class="note-flag" title="'+s.note+'">!</span>' : ''; }
 let sortMode = 'lastEdited';
 function applySortMode(list){ const arr=[...list]; if(sortMode==='lastEdited') return arr.sort((a,b)=>new Date(b.lastEdited)-new Date(a.lastEdited)); if(sortMode==='note') return arr.sort((a,b)=>{ const nA=a.note?0:1,nB=b.note?0:1; if(nA!==nB) return nA-nB; const dA=a.end?daysUntil(a.end):999999,dB=b.end?daysUntil(b.end):999999; return dA-dB; }); if(sortMode==='completion') return arr.sort((a,b)=>(a.end?daysUntil(a.end):999999)-(b.end?daysUntil(b.end):999999)); if(sortMode==='never') return arr.sort((a,b)=>{ const nA=neverVisitedFlag(a)?0:1,nB=neverVisitedFlag(b)?0:1; if(nA!==nB) return nA-nB; const dA=a.end?daysUntil(a.end):999999,dB=b.end?daysUntil(b.end):999999; return dA-dB; }); if(sortMode==='priority') return prioritySort(arr); if(sortMode==='name') return arr.sort((a,b)=>a.name.localeCompare(b.name)); return arr; }
@@ -1144,7 +1138,6 @@ function renderCalendarGrid(gridId,labelId,state,store,eventClass,storeKeyName){
 
 
   const todayStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
-  const expandedByGrid = (window.__calCompanyExpanded[gridId] !== false);
   for(let d=1; d<=daysInMonth; d++){
     const cell=document.createElement('div'); cell.className='cal-cell';
     const dateStr=state.year+'-'+String(state.month+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
@@ -1159,56 +1152,15 @@ function renderCalendarGrid(gridId,labelId,state,store,eventClass,storeKeyName){
     if(holidayName) dateHTML+='<div class="holiday-badge">🎉 '+holidayName+'</div>';
     cell.innerHTML=dateHTML;
 
-    // 해당 날짜의 (사이트 -> 등록된 siteName 목록) 그룹화 (업체 묶음)
-    const dateMap = {};
+
     Object.entries(store).filter(([siteName])=>sites.some(s=>s.name===siteName)).forEach(([siteName,dateArr])=>{
       (dateArr||[]).forEach(dstr=>{
         if(dstr===dateStr){
-          if(!dateMap[siteName]) dateMap[siteName] = siteName;
-        }
-      });
-    });
-    // 업체별 그룹화
-    const groupMap = {};
-    Object.keys(dateMap).forEach(siteName=>{
-      const s = sites.find(x=>x.name===siteName) || {};
-      const company = (s.company && s.company.trim()) ? s.company.trim() : '회사 미지정';
-      if(!groupMap[company]) groupMap[company] = [];
-      groupMap[company].push(siteName);
-    });
-    Object.entries(groupMap).forEach(([company, siteList])=>{
-      const wrap = document.createElement('div');
-      wrap.className = 'cal-event cal-event-company ' + (eventClass||'');
-      wrap.style.background = companyColor(company);
-      wrap.title = company + ' · ' + siteList.length + '건';
-      wrap.draggable = true;
-      const header = document.createElement('div');
-      header.className = 'cal-event-company-header';
-      header.textContent = company + ' · ' + siteList.length;
-      header.style.cssText = 'cursor:pointer;font-weight:800;';
-      header.addEventListener('click', (e)=>{ e.stopPropagation(); wrap.classList.toggle('expanded'); });
-      header.addEventListener('dblclick', (e)=>{ e.stopPropagation(); });
-      // 드래그: 모든 하위 site 일괄 이동
-      header.addEventListener('dragstart',(e)=>{
-        e.stopPropagation();
-        const isCopy=e.ctrlKey||e.metaKey;
-        const events = siteList.map(sn=>({key:eventKey(storeKeyName,sn,dateStr),store:storeKeyName,site:sn,date:dateStr}));
-        e.dataTransfer.setData('text/plain',JSON.stringify({mode:isCopy?'copy':'move',events}));
-      });
-      header.addEventListener('contextmenu',(e)=>{ e.preventDefault(); e.stopPropagation(); siteList.forEach(sn=>showContextMenu(e,sn,storeKeyName,dateStr)); });
-      wrap.appendChild(header);
-      if(expandedByGrid){
-        const childWrap = document.createElement('div');
-        childWrap.className = 'cal-event-children';
-        siteList.forEach(siteName=>{
-          const ev = document.createElement('div');
-          ev.className = 'cal-event cal-event-child';
-          ev.style.background = siteColor(siteName);
-          ev.style.color = '#fff';
-          ev.textContent = siteName;
-          ev.title = siteName;
-          ev.draggable = true;
-          const key = eventKey(storeKeyName,siteName,dateStr);
+          const ev=document.createElement('div');
+          ev.className='cal-event '+(eventClass||'');
+          ev.style.background=siteColor(siteName);
+          ev.textContent=siteName; ev.title=siteName; ev.draggable=true;
+          const key=eventKey(storeKeyName,siteName,dateStr);
           if(selectedEvents.some(se=>se.key===key)) ev.classList.add('selected');
           ev.addEventListener('click',e=>{
             e.stopPropagation();
@@ -1219,18 +1171,16 @@ function renderCalendarGrid(gridId,labelId,state,store,eventClass,storeKeyName){
           });
           ev.addEventListener('dblclick',e=>{ e.stopPropagation(); openDetailByName(siteName); });
           ev.addEventListener('contextmenu',e=>showContextMenu(e,siteName,storeKeyName,dateStr));
-          ev.addEventListener('dragstart',(e)=>{
+          ev.addEventListener('dragstart',e=>{
             e.stopPropagation();
             const isCopy=e.ctrlKey||e.metaKey;
             const key2=eventKey(storeKeyName,siteName,dateStr);
             let payloadEvents=selectedEvents.some(se=>se.key===key2)?selectedEvents.slice():[{key:key2,store:storeKeyName,site:siteName,date:dateStr}];
             e.dataTransfer.setData('text/plain',JSON.stringify({mode:isCopy?'copy':'move',events:payloadEvents}));
           });
-          childWrap.appendChild(ev);
-        });
-        wrap.appendChild(childWrap);
-      }
-      cell.appendChild(wrap);
+          cell.appendChild(ev);
+        }
+      });
     });
 
 
@@ -1278,25 +1228,208 @@ function renderCalendarGrid(gridId,labelId,state,store,eventClass,storeKeyName){
           saveStore(ev.store==='visit'?STORE_KEY:CONTACT_KEY,ev.store==='visit'?visitStore:contactStore);
         });
         clearSelection();
-        refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
-        syncTasks.forEach(task=>task());
       }
+      refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
+      syncTasks.forEach(task=>task());
     });
+    grid.appendChild(cell);
   }
 }
-window.toggleCalendarCompanyView = function(gridId, btn){
-  window.__calCompanyExpanded[gridId] = !window.__calCompanyExpanded[gridId];
-  if(btn){ btn.textContent = window.__calCompanyExpanded[gridId] ? '업체 묶음 ON' : '업체 묶음 OFF (공사명만)'; btn.classList.toggle('off', !window.__calCompanyExpanded[gridId]); }
-  refreshCalendars();
-};
 
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { clearSelection(); refreshCalendars(); return; }
+
+
+  const isMeta = e.ctrlKey || e.metaKey;
+
+
+  if (isMeta && (e.key === 'c' || e.key === 'C')) {
+    if (selectedEvents.length > 0) {
+      clipboardEvents = JSON.parse(JSON.stringify(selectedEvents));
+      showSyncBanner('📋 '+clipboardEvents.length+'건 복사됨 (붙여넣을 날짜 클릭 후 Ctrl+V)', '#2563eb');
+    }
+  }
+
+
+  if (isMeta && (e.key === 'v' || e.key === 'V')) {
+    if (clipboardEvents.length > 0 && lastFocusedCellDate) {
+      const targetDate = lastFocusedCellDate;
+      const syncTasks = [];
+      clipboardEvents.forEach(ev => {
+        const st = ev.store === 'visit' ? visitStore : contactStore;
+        st[ev.site] = st[ev.site] || [];
+        if (!st[ev.site].includes(targetDate)) st[ev.site].push(targetDate);
+        syncTasks.push(() => syncAddDate(ev.store, ev.site, targetDate));
+      });
+      saveStore(STORE_KEY, visitStore);
+      saveStore(CONTACT_KEY, contactStore);
+      clearSelection();
+      refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
+      syncTasks.forEach(task => task());
+      showSyncBanner('✅ '+targetDate+' 에 붙여넣기 완료 (노션 반영 중)', '#16a34a');
+    } else if (clipboardEvents.length > 0) {
+      showSyncBanner('⚠ 먼저 붙여넣을 날짜 셀을 클릭하세요', '#f59e0b');
+    }
+  }
+});
+
+
+document.addEventListener('click',e=>{ if(!e.target.closest('.cal-event')&&!e.target.closest('.cal-cell')){ clearSelection(); setSelectedSideCard(null, null); refreshCalendars(); } });
+
+
+function getPropertyName(storeType){ return storeType==='visit' ? '방문일자' : '연락요청 일자'; }
+
+
+function findPageIdFromServerDetails(site,storeType,date){
+  if(!site || !site.pageDetails) return null;
+  const key = storeType==='visit' ? 'visitDate' : 'contactDate';
+  const found = site.pageDetails.find(pd => pd[key] === date);
+  return found ? found.pageId : null;
+}
+
+
+async function syncAddDateCore(storeType,siteName,date){
+  const site=sites.find(s=>s.name===siteName);
+  if(!site){ console.warn('현장 정보 없음:',siteName); return; }
+  const propertyName=getPropertyName(storeType);
+  const map=getPageMap(storeType);
+  const hasAnyMapped=(map[siteName]||[]).length>0;
+
+
+  showSyncBanner('노션 저장 중... '+siteName);
+  try{
+    if(!hasAnyMapped && site.notionId){
+      const res=await fetch(API_BASE+'/api/update-visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pageId:site.notionId,propertyName,date})});
+      const data=await res.json();
+      if(data.ok){ setPageIdForDate(storeType,siteName,date,site.notionId); showSyncBanner('✅ Notion 저장 완료: '+siteName,'#16a34a'); pushActionLog({action:'add_'+storeType, siteName, date, result:'ok', text:'캘린더에서 추가 후 노션 저장'}); }
+      else { showSyncBanner('⚠ Notion 저장 실패: '+(data.error||''),'#ef4444'); }
+    } else {
+      const sourcePageId = anyPageIdForSite(storeType,siteName);
+      const res=await fetch(API_BASE+'/api/duplicate-page',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sourcePageId,propertyName,date})});
+      const data=await res.json();
+      if(data.ok){ setPageIdForDate(storeType,siteName,date,data.newPageId); showSyncBanner('✅ Notion 페이지 복제 및 저장 완료: '+siteName,'#16a34a'); pushActionLog({action:'add_'+storeType, siteName, date, result:'ok', text:'페이지 복제 후 노션 저장'}); }
+      else { showSyncBanner('⚠ Notion 복제 실패: '+(data.error||''),'#ef4444'); }
+    }
+  }catch(e){ showSyncBanner('💾 로컬 저장 완료 (서버 동기화 대기 중)','#16a34a'); }
+}
+
+
+async function syncMoveDateCore(storeType,siteName,oldDate,newDate){
+  const site=sites.find(s=>s.name===siteName);
+  const propertyName=getPropertyName(storeType);
+  const pageId = findPageIdForDate(storeType,siteName,oldDate)
+    || findPageIdFromServerDetails(site,storeType,oldDate)
+    || (site&&site.notionId);
+  if(!pageId){ console.warn('이동할 노션 페이지를 찾지 못함:',siteName,oldDate); return; }
+  showSyncBanner('노션 날짜 이동 중... '+siteName);
+  try{
+    const res=await fetch(API_BASE+'/api/update-visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pageId,propertyName,date:newDate})});
+    const data=await res.json();
+    if(data.ok){ removePageIdForDate(storeType,siteName,oldDate); setPageIdForDate(storeType,siteName,newDate,pageId); showSyncBanner('✅ Notion 날짜 이동 완료: '+siteName,'#16a34a'); pushActionLog({action:'move_'+storeType, siteName, date:newDate, result:'ok', text:`${oldDate} -> ${newDate}`}); }
+    else { showSyncBanner('⚠ Notion 이동 실패: '+(data.error||''),'#ef4444'); }
+  }catch(e){ showSyncBanner('💾 로컬 반영 완료 (서버 동기화 대기 중)','#16a34a'); }
+}
+
+
+async function syncDeleteDateCore(storeType,siteName,date){
+  const site=sites.find(s=>s.name===siteName);
+  const propertyName=getPropertyName(storeType);
+  const pageId = findPageIdForDate(storeType,siteName,date)
+    || findPageIdFromServerDetails(site,storeType,date)
+    || (site&&site.notionId);
+  if(!pageId){ console.warn('삭제할 노션 페이지를 찾지 못함:',siteName,date); return; }
+  showSyncBanner('노션 날짜 삭제 중... '+siteName);
+  try{
+    const res=await fetch(API_BASE+'/api/update-visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pageId,propertyName,date:null})});
+    const data=await res.json();
+    if(data.ok){ removePageIdForDate(storeType,siteName,date); showSyncBanner('✅ Notion 날짜 삭제 완료: '+siteName,'#16a34a'); pushActionLog({action:'delete_'+storeType, siteName, date, result:'ok', text:'날짜 삭제'}); }
+    else { showSyncBanner('⚠ Notion 삭제 실패: '+(data.error||''),'#ef4444'); }
+  }catch(e){ showSyncBanner('💾 로컬 삭제 완료 (서버 동기화 대기 중)','#16a34a'); }
+}
+async function syncDateToNotion(siteName,storeType,dateStr){
+  if(dateStr===null){
+    return;
+  }
+  await syncAddDate(storeType,siteName,dateStr);
+}
+function showSyncBanner(text,color){ let el=document.getElementById('sync-banner'); if(!el){ el=document.createElement('div'); el.id='sync-banner'; el.className='sync-banner'; document.body.appendChild(el); } el.style.background=color||'#057a75'; el.textContent=text; el.style.display='block'; clearTimeout(el._t); el._t=setTimeout(()=>{ el.style.display='none'; },3000); }
+
+
+function filterCardBucket(inputId, containerId){ const q=(document.getElementById(inputId)?.value||'').trim().toLowerCase(); document.querySelectorAll(containerId+' .drag-card').forEach(el=>{ const name=(el.dataset.siteName||el.textContent||'').toLowerCase(); el.style.display=name.includes(q)?'':'none'; }); }
+function filterCalSiteList(){ filterCardBucket('cal-site-search-unvisited','#unvisited-cards'); filterCardBucket('cal-site-search-never','#never-cards'); }
+function filterCalSiteList2(){ filterCardBucket('cal-site-search-2-unvisited','#unvisited-cards-2'); filterCardBucket('cal-site-search-2-never','#never-cards-2'); }
+
+
+function setupSideListDrop(containerId){
+  const el=document.getElementById(containerId); if(!el) return;
+  el.addEventListener('dragover',e=>{ e.preventDefault(); el.classList.add('drag-over'); });
+  el.addEventListener('dragleave',()=>el.classList.remove('drag-over'));
+  el.addEventListener('drop',e=>{
+    e.preventDefault(); el.classList.remove('drag-over');
+    let data=null;
+    try{ data=JSON.parse(e.dataTransfer.getData('text/plain')); }catch(err){ return; }
+    if(!data || data.mode==='new') return;
+    const syncTasks=[];
+    (data.events||[]).forEach(ev=>{
+      const st=ev.store==='visit'?visitStore:contactStore;
+      if(data.mode==='move' && st[ev.site]){
+        const idx=st[ev.site].indexOf(ev.date); if(idx>=0) st[ev.site].splice(idx,1);
+        syncTasks.push(()=>syncDeleteDate(ev.store, ev.site, ev.date));
+      }
+    });
+    const touched=new Set((data.events||[]).map(ev=>ev.store));
+    touched.forEach(store=>saveStore(store==='visit'?STORE_KEY:CONTACT_KEY,store==='visit'?visitStore:contactStore));
+    clearSelection(); refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
+    syncTasks.forEach(task=>task());
+  });
+}
+['unvisited-cards','never-cards','unvisited-cards-2','never-cards-2'].forEach(setupSideListDrop);
+
+
+function calendarDateString(date){ return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0'); }
+function getCalendarFocusDate(gridId,state){
+  if(lastFocusedGridId===gridId && lastFocusedCellDate) return lastFocusedCellDate;
+  const thisMonthToday=now.getFullYear()===state.year && now.getMonth()===state.month;
+  return state.year+'-'+String(state.month+1).padStart(2,'0')+'-'+String(thisMonthToday?now.getDate():1).padStart(2,'0');
+}
+function renderCalendarWorkbench(gridId,state,store,railId,focusId,countId,summaryId,label){
+  const rail=document.getElementById(railId), focusEl=document.getElementById(focusId), countEl=document.getElementById(countId), summary=document.getElementById(summaryId);
+  if(!rail||!focusEl||!countEl||!summary) return;
+  const focusDate=getCalendarFocusDate(gridId,state); const focus=new Date(focusDate+'T00:00:00');
+  const days=['일','월','화','수','목','금','토']; const isToday=focusDate===calendarDateString(now); const dayEvents=[];
+  Object.entries(store).forEach(([site,dateArr])=>{ if((dateArr||[]).includes(focusDate)) dayEvents.push(site); });
+  focusEl.textContent=(focus.getMonth()+1)+'월 '+focus.getDate()+'일 · '+days[focus.getDay()] + (isToday?' · 오늘':'');
+  countEl.textContent=dayEvents.length+'건'; rail.innerHTML='';
+  for(let offset=-3;offset<=3;offset++){
+    const date=new Date(focus); date.setDate(focus.getDate()+offset); const dateStr=calendarDateString(date); const button=document.createElement('button');
+    button.type='button'; button.className='date-rail-item'+(dateStr===focusDate?' active':''); button.innerHTML='<span>'+days[date.getDay()]+'</span><strong>'+date.getDate()+'</strong>';
+    button.setAttribute('aria-label',(date.getMonth()+1)+'월 '+date.getDate()+'일 '+label+' 보기'); button.onclick=()=>{ lastFocusedGridId=gridId; lastFocusedCellDate=dateStr; refreshCalendars(); };
+    rail.appendChild(button);
+  }
+  if(dayEvents.length){
+    summary.innerHTML='<p class="calendar-summary-copy">오늘 처리할 '+label+' '+dayEvents.length+'건</p><div class="calendar-summary-list"></div>';
+    const list=summary.querySelector('.calendar-summary-list');
+    dayEvents.forEach(site=>{ const source=sites.find(s=>s.name===site)||{}; const item=document.createElement('button'); item.type='button'; item.className='calendar-summary-item'; item.innerHTML='<span>●</span><span>'+site+'<small>'+(source.company||'담당자 확인 필요')+'</small></span>'; item.onclick=()=>openDetailByName(site); list.appendChild(item); });
+  }else{
+    summary.innerHTML='<div class="calendar-summary-empty"><span>○</span><span><strong>오늘은 '+label+'이 없습니다.</strong>아래 목록에서 현장을 선택한 뒤 날짜를 눌러 등록하세요.</span></div>';
+  }
+}
+function refreshCalendars(){
+  renderCalendarGrid('cal-grid','cal-month-label',calState,visitStore,'','visit');
+  renderCalendarGrid('cal-grid-contact','cal-month-label-contact',calStateContact,contactStore,'contact','contact');
+  renderSideCards('unvisited-cards','never-cards','visit');
+  renderSideCards('unvisited-cards-2','never-cards-2','contact');
+  renderCalendarWorkbench('cal-grid',calState,visitStore,'visit-date-rail','visit-calendar-focus','visit-calendar-count','visit-day-summary','방문 일정');
+  renderCalendarWorkbench('cal-grid-contact',calStateContact,contactStore,'contact-date-rail','contact-calendar-focus','contact-calendar-count','contact-day-summary','연락 요청');
+}
 function changeMonth(delta){ calState.month+=delta; if(calState.month<0){calState.month=11; calState.year--;} if(calState.month>11){calState.month=0; calState.year++;} refreshCalendars(); }
 function changeMonthContact(delta){ calStateContact.month+=delta; if(calStateContact.month<0){calStateContact.month=11; calStateContact.year--;} if(calStateContact.month>11){calStateContact.month=0; calStateContact.year++;} refreshCalendars(); }
 
 
 function fmtDateDot(d){ if(!d) return '-'; return String(d).replace(/-/g,'.'); }
-function openDetailByName(name){ const s=sites.find(x=>x.name===name); if(!s) return; try{window.__calScrollBeforeDetail = window.__calScrollBeforeDetail || {}; const activePage = document.querySelector('.page.active'); const grid = activePage ? activePage.querySelector('.cal-grid') : null; if(grid) window.__calScrollBeforeDetail.scrollTop = grid.scrollTop; if(activePage) window.__calScrollBeforeDetail.pageScroll = activePage.scrollTop;}catch(e){} document.getElementById('detail-title').textContent=s.name; document.getElementById('detail-manager-company').textContent=s.company||'-'; document.getElementById('detail-manager-site').textContent=s.site||s.region||'-'; document.getElementById('detail-manager-name').textContent=s.managerName||'-'; document.getElementById('detail-manager-contact').innerHTML=normalizePhone(s.contact)?'<a class="detail-call-link" href="tel:'+normalizePhone(s.contact)+'">'+(s.contact||'-')+'</a>':(s.contact||'-'); const vdates=(visitStore[s.name]||[]).slice().sort(); const cdates=(contactStore[s.name]||[]).slice().sort(); document.getElementById('detail-contact-date').textContent=cdates.length?fmtDateDot(cdates[cdates.length-1]):'-'; document.getElementById('detail-visit-date').textContent=vdates.length?fmtDateDot(vdates[vdates.length-1]):'-'; const target=s.targetVisits||2; const done=vdates.length; document.getElementById('detail-progress-text').textContent='('+done+' / '+target+')'; const boxesWrap=document.getElementById('detail-progress-boxes'); boxesWrap.innerHTML=''; const totalBoxes=Math.max(target,done); for(let i=0;i<totalBoxes;i++){ const box=document.createElement('div'); box.className='progress-box'+(i<done?' filled':''); boxesWrap.appendChild(box); } document.getElementById('detail-visit-history-title').textContent='방문이력 (총 '+done+'회)'; const histList=document.getElementById('detail-visit-history-list'); histList.innerHTML=vdates.length?vdates.slice().reverse().map(d=>'<span class="visit-history-chip">'+fmtDateDot(d)+'</span>').join(''):'<span style="color:#94a3b8;font-size:13px;">방문 기록 없음</span>'; document.getElementById('detail-contract-date').textContent=fmtDateDot(s.contractDate)||'-'; document.getElementById('detail-start-date').textContent=fmtDateDot(s.start)||'-'; document.getElementById('detail-company').textContent=s.company||'-'; document.getElementById('detail-end-date').textContent=fmtDateDot(s.end)||'-'; document.getElementById('detail-amount').textContent=(s.amount||0).toLocaleString()+'원'; document.getElementById('detail-biz-open-no').textContent=s.bizOpenNo||'-'; document.getElementById('detail-biz-mgmt-no').textContent=s.bizMgmtNo||'-'; document.getElementById('detail-mgmt-no').textContent=s.mgmtNo||'-'; document.getElementById('detail-site').textContent=s.site||s.region||'-'; const noteWrap=document.getElementById('detail-note-wrap'); noteWrap.innerHTML=s.note?'<div class="detail-note">⚠️ 비고<br><span>'+s.note+'</span></div>':''; document.getElementById('detail-modal').classList.add('active'); attachCopyButtons(); }
-function closeDetail(){ document.getElementById('detail-modal').classList.remove('active');     try{ const saved = window.__calScrollBeforeDetail; const activePage = document.querySelector('.page.active'); const grid = activePage ? activePage.querySelector('.cal-grid') : null; if(grid && saved && typeof saved.scrollTop === 'number'){ grid.scrollTop = saved.scrollTop; } if(activePage && saved && typeof saved.pageScroll === 'number'){ activePage.scrollTop = saved.pageScroll; } }catch(e){} }
+function openDetailByName(name){ const s=sites.find(x=>x.name===name); if(!s) return; document.getElementById('detail-title').textContent=s.name; document.getElementById('detail-manager-company').textContent=s.company||'-'; document.getElementById('detail-manager-site').textContent=s.site||s.region||'-'; document.getElementById('detail-manager-name').textContent=s.managerName||'-'; document.getElementById('detail-manager-contact').innerHTML=normalizePhone(s.contact)?'<a class="detail-call-link" href="tel:'+normalizePhone(s.contact)+'">'+(s.contact||'-')+'</a>':(s.contact||'-'); const vdates=(visitStore[s.name]||[]).slice().sort(); const cdates=(contactStore[s.name]||[]).slice().sort(); document.getElementById('detail-contact-date').textContent=cdates.length?fmtDateDot(cdates[cdates.length-1]):'-'; document.getElementById('detail-visit-date').textContent=vdates.length?fmtDateDot(vdates[vdates.length-1]):'-'; const target=s.targetVisits||2; const done=vdates.length; document.getElementById('detail-progress-text').textContent='('+done+' / '+target+')'; const boxesWrap=document.getElementById('detail-progress-boxes'); boxesWrap.innerHTML=''; const totalBoxes=Math.max(target,done); for(let i=0;i<totalBoxes;i++){ const box=document.createElement('div'); box.className='progress-box'+(i<done?' filled':''); boxesWrap.appendChild(box); } document.getElementById('detail-visit-history-title').textContent='방문이력 (총 '+done+'회)'; const histList=document.getElementById('detail-visit-history-list'); histList.innerHTML=vdates.length?vdates.slice().reverse().map(d=>'<span class="visit-history-chip">'+fmtDateDot(d)+'</span>').join(''):'<span style="color:#94a3b8;font-size:13px;">방문 기록 없음</span>'; document.getElementById('detail-contract-date').textContent=fmtDateDot(s.contractDate)||'-'; document.getElementById('detail-start-date').textContent=fmtDateDot(s.start)||'-'; document.getElementById('detail-company').textContent=s.company||'-'; document.getElementById('detail-end-date').textContent=fmtDateDot(s.end)||'-'; document.getElementById('detail-amount').textContent=(s.amount||0).toLocaleString()+'원'; document.getElementById('detail-biz-open-no').textContent=s.bizOpenNo||'-'; document.getElementById('detail-biz-mgmt-no').textContent=s.bizMgmtNo||'-'; document.getElementById('detail-mgmt-no').textContent=s.mgmtNo||'-'; document.getElementById('detail-site').textContent=s.site||s.region||'-'; const noteWrap=document.getElementById('detail-note-wrap'); noteWrap.innerHTML=s.note?'<div class="detail-note">⚠️ 비고<br><span>'+s.note+'</span></div>':''; document.getElementById('detail-modal').classList.add('active'); attachCopyButtons(); }
+function closeDetail(){ document.getElementById('detail-modal').classList.remove('active'); }
 function copyToClipboard(text,btn){ navigator.clipboard.writeText(text).then(()=>{ if(btn){ const orig=btn.textContent; btn.textContent='✅'; setTimeout(()=>btn.textContent=orig,1200); } }).catch(()=>{}); }
 function attachCopyButtons(){ document.querySelectorAll('#detail-modal .copy-btn').forEach(b=>b.remove()); const targets=['detail-manager-company','detail-manager-name','detail-manager-contact','detail-contact-date','detail-visit-date','detail-contract-date','detail-start-date','detail-end-date','detail-amount','detail-site','detail-mgmt-no','detail-biz-open-no','detail-biz-mgmt-no']; targets.forEach(id=>{ const el=document.getElementById(id); if(!el) return; const btn=document.createElement('span'); btn.className='copy-btn'; btn.textContent='📋'; btn.title='복사'; btn.style.cssText='cursor:pointer;margin-left:8px;font-size:18px;padding:2px 4px;'; btn.onclick=(e)=>{ e.stopPropagation(); copyToClipboard(el.textContent.trim(),btn); }; el.appendChild(btn); }); const titleEl=document.getElementById('detail-title'); if(titleEl){ const btn=document.createElement('span'); btn.className='copy-btn'; btn.textContent='📋'; btn.title='복사'; btn.style.cssText='cursor:pointer;margin-left:10px;font-size:20px;padding:2px 4px;'; btn.onclick=(e)=>{ e.stopPropagation(); copyToClipboard(titleEl.textContent.replace('📋','').trim(),btn); }; titleEl.appendChild(btn); } }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeDetail(); closeKpiList(); } });
@@ -3578,7 +3711,6 @@ document.addEventListener('DOMContentLoaded', () => {
       await Promise.allSettled(Array.from(detailPendingSaves));
     }
     modal.classList.remove('active');
-    try{ const saved = window.__calScrollBeforeDetail; const activePage = document.querySelector('.page.active'); const grid = activePage ? activePage.querySelector('.cal-grid') : null; if(grid && saved && typeof saved.scrollTop === 'number'){ grid.scrollTop = saved.scrollTop; } if(activePage && saved && typeof saved.pageScroll === 'number'){ activePage.scrollTop = saved.pageScroll; } }catch(e){}
   };
   renderSideCards = function(containerIdUnvisited, containerIdNever, storeType){
     const cUn = document.getElementById(containerIdUnvisited); const cNev = document.getElementById(containerIdNever);
