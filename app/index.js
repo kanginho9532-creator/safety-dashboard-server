@@ -177,7 +177,8 @@ function groupSites(rawSites) {
         visitDates: s.lastVisit ? [s.lastVisit] : [],
         contactDates: s.contactRequest ? [s.contactRequest] : [],
         pageIds: [s.id],
-        pageDetails: [detail]
+        pageDetails: [detail],
+        _statuses: s.status ? [s.status] : []
       };
     } else {
       const g = grouped[key];
@@ -185,19 +186,27 @@ function groupSites(rawSites) {
       if (s.contactRequest && !g.contactDates.includes(s.contactRequest)) g.contactDates.push(s.contactRequest);
       if (!g.pageIds.includes(s.id)) g.pageIds.push(s.id);
       g.pageDetails.push(detail);
+      if (s.status && !g._statuses.includes(s.status)) g._statuses.push(s.status);
       if (new Date(s.createdAt || s.lastEdited) > new Date(g.createdAt || 0)) g.createdAt = s.createdAt || s.lastEdited;
       if (new Date(s.lastEdited) > new Date(g.lastEdited)) {
-        Object.assign(g, s, { createdAt: g.createdAt, visitDates: g.visitDates, contactDates: g.contactDates, pageIds: g.pageIds, pageDetails: g.pageDetails });
+        Object.assign(g, s, { createdAt: g.createdAt, visitDates: g.visitDates, contactDates: g.contactDates, pageIds: g.pageIds, pageDetails: g.pageDetails, _statuses: g._statuses });
       }
     }
+  });
+  const COMPLETED_KEYWORDS = ['완료','준공완료','공사완료','공사 완료','종료','종결'];
+  const isCompletedGroup = (statuses) => (statuses || []).some(st => {
+    const norm = String(st || '').replace(/\s+/g,'');
+    return COMPLETED_KEYWORDS.some(kw => norm.includes(kw.replace(/\s+/g,'')));
   });
   return Object.values(grouped).map((g) => ({
     ...g,
     visits: g.visitDates.length,
     lastVisit: g.visitDates.slice().sort().reverse()[0] || null,
     contactDates: g.contactDates.slice().sort().reverse(),
-    visitDates: g.visitDates.slice().sort().reverse()
-  })).sort((a, b) => new Date(b.lastEdited) - new Date(a.lastEdited));
+    visitDates: g.visitDates.slice().sort().reverse(),
+    _completed: isCompletedGroup(g._statuses),
+    _allStatuses: (g._statuses || []).slice()
+  })).filter(g => !g._completed).map(({ _completed, _allStatuses, _statuses, ...rest }) => rest).sort((a, b) => new Date(b.lastEdited) - new Date(a.lastEdited));
 }
 async function queryAllPages(databaseId, sorts = [{ timestamp: 'last_edited_time', direction: 'descending' }]) {
   if (!databaseId) return [];
