@@ -599,7 +599,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 	            <button onclick="changeMonth(1)">▶</button>
 	          </div>
 	          
-	          <div class="cal-grid" id="cal-grid"></div>
+	          <button type="button" class="cal-group-toggle" onclick="toggleCalendarCompanyView('cal-grid', this)" style="padding:4px 10px;border:1px solid #dce7e4;background:#fff;color:#057a75;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;margin:0 4px 4px 0;">업체 묶음 ON</button><div class="cal-grid" id="cal-grid"></div>
 	        </div>
 	        <section class="calendar-workbench" aria-label="선택 날짜 방문 일정">
 	          <div class="calendar-context"><div class="calendar-context-left"><span class="calendar-signal"></span><div><span class="calendar-context-label">방문 일정</span><strong class="calendar-context-title" id="visit-calendar-focus">선택 날짜를 확인하세요</strong></div></div><span class="calendar-context-count" id="visit-calendar-count">0건</span></div>
@@ -631,7 +631,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 	            <button onclick="changeMonthContact(1)">▶</button>
 	          </div>
 	          
-	          <div class="cal-grid" id="cal-grid-contact"></div>
+	          <button type="button" class="cal-group-toggle" onclick="toggleCalendarCompanyView('cal-grid-contact', this)" style="padding:4px 10px;border:1px solid #dce7e4;background:#fff;color:#057a75;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;margin:0 4px 4px 0;">업체 묶음 ON</button><div class="cal-grid" id="cal-grid-contact"></div>
 	        </div>
 	        <section class="calendar-workbench" aria-label="선택 날짜 연락 요청">
 	          <div class="calendar-context"><div class="calendar-context-left"><span class="calendar-signal"></span><div><span class="calendar-context-label">연락 요청</span><strong class="calendar-context-title" id="contact-calendar-focus">선택 날짜를 확인하세요</strong></div></div><span class="calendar-context-count" id="contact-calendar-count">0건</span></div>
@@ -3993,5 +3993,16 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 
 </script>
-</body>
+<script>
+window.toggleCalendarCompanyView = function(gridId, btn){
+  try{
+    window.__calCompanyExpanded = window.__calCompanyExpanded || {};
+    window.__calCompanyExpanded[gridId] = !window.__calCompanyExpanded[gridId];
+    var on = window.__calCompanyExpanded[gridId];
+    if(btn){ btn.textContent = on ? '업체 묶음 ON' : '업체 묶음 OFF (공사명만)'; btn.classList.toggle('off', !on); }
+    if(typeof refreshCalendars === 'function'){ refreshCalendars(); }
+    else if(typeof renderCalendarWorkbench === 'function'){ renderCalendarWorkbench(); }
+  }catch(e){ console.warn('toggle err:', e); }
+};
+</script></body>
 </html>
