@@ -3990,6 +3990,204 @@ document.addEventListener('DOMContentLoaded', () => {
 
   registerModalStacking();
   setupMobileSideToggles();
+
+  // ==== 회사명 토글 + 스크롤 보존 (2026-08-27) ====
+  const calCompanyExpandedByCell = (window.__calCompanyExpandedByCell = window.__calCompanyExpandedByCell || {});
+
+  function buildCellCompanyGroups(store, dateStr, storeKeyName){
+    const groups = new Map();
+    Object.entries(store || {}).forEach(([siteName, dateArr]) => {
+      if(!(dateArr || []).includes(dateStr)) return;
+      if(!Array.isArray(sites) || !sites.some(s => s.name === siteName)) return;
+      const site = sites.find(s => s.name === siteName) || {};
+      const companyKey = (site.company || '회사명 미지정').trim() || '회사명 미지정';
+      if(!groups.has(companyKey)){
+        groups.set(companyKey, { companyKey, sites: [] });
+      }
+      groups.get(companyKey).sites.push({
+        siteName,
+        latestDisplay: typeof getLatestVisitDisplay === 'function' ? getLatestVisitDisplay(siteName) : '',
+        color: typeof siteColor === 'function' ? siteColor(siteName) : '#2563eb'
+      });
+    });
+    return Array.from(groups.values())
+      .map(g => ({ ...g, sites: g.sites.sort((a,b)=>String(a.siteName).localeCompare(String(b.siteName),'ko')) }))
+      .sort((a,b)=>String(a.companyKey).localeCompare(String(b.companyKey),'ko'));
+  }
+
+  function renderCalendarGridWithCompanyGrouping(gridId, labelId, state, store, eventClass, storeKeyName){
+    const grid = document.getElementById(gridId);
+    const label = document.getElementById(labelId);
+    if(!grid || !label) return;
+    grid.innerHTML = '';
+    label.textContent = state.year + '년 ' + (state.month + 1) + '월';
+    const firstDay = new Date(state.year, state.month, 1).getDay();
+    const daysInMonth = new Date(state.year, state.month + 1, 0).getDate();
+    const weekNames = ['일','월','화','수','목','금','토'];
+    weekNames.forEach((weekName, weekIndex) => {
+      const h = document.createElement('div');
+      h.style.fontWeight = '700'; h.style.fontSize = '15px'; h.style.textAlign = 'center';
+      h.style.color = weekIndex === 0 ? '#ef4444' : (weekIndex === 6 ? '#2563eb' : '#64748b');
+      h.style.padding = '4px 0'; h.textContent = weekName;
+      grid.appendChild(h);
+    });
+    for(let i = 0; i < firstDay; i++) grid.appendChild(document.createElement('div'));
+
+    const todayStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+
+    for(let d = 1; d <= daysInMonth; d++){
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell';
+      const dateStr = state.year + '-' + String(state.month+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      cell.dataset.date = dateStr;
+      const dayOfWeek = new Date(state.year, state.month, d).getDay();
+      const holidayName = getHolidayName(state.year, state.month, d);
+      if(holidayName) cell.classList.add('cal-holiday');
+      if(dateStr === todayStr) cell.classList.add('cal-today');
+      if(lastFocusedGridId === gridId && lastFocusedCellDate === dateStr) cell.classList.add('cal-focused');
+      const dateColor = holidayName ? '#dc2626' : (dayOfWeek === 0 ? '#ef4444' : (dayOfWeek === 6 ? '#2563eb' : '#334155'));
+      let dateHTML = '<div class="cal-date-head"><div class="date-num" style="color:' + dateColor + ';">' + d + (dateStr === todayStr ? ' <span class="today-badge">오늘</span>' : '') + '</div><button type="button" class="cal-add-btn" aria-label="' + d + '일 일정 추가" onclick="event.stopPropagation();openCalendarAddModal(\'' + storeKeyName + '\',\'' + dateStr + '\')">+</button></div>';
+      if(holidayName) dateHTML += '<div class="holiday-badge">🎉 ' + holidayName + '</div>';
+      cell.innerHTML = dateHTML;
+
+      const groups = buildCellCompanyGroups(store, dateStr, storeKeyName);
+
+      groups.forEach(group => {
+        const companyKey = group.companyKey;
+        const cellKey = gridId + '::' + dateStr + '::' + companyKey;
+        const isExpanded = calCompanyExpandedByCell[cellKey] === true;
+
+        const header = document.createElement('div');
+        header.className = 'cal-company-header';
+        header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:4px;padding:5px 6px;margin-top:4px;border-radius:7px;background:#eaf6f3;border:1px solid #cfe6e0;color:#057a75;font-size:11.5px;font-weight:800;cursor:pointer;user-select:none;';
+        const labelSpan = document.createElement('span');
+        labelSpan.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        labelSpan.textContent = (isExpanded ? '▾ ' : '▸ ') + companyKey + ' (' + group.sites.length + ')';
+        header.appendChild(labelSpan);
+        const right = document.createElement('span');
+        right.style.cssText = 'font-size:10px;color:#475569;';
+        right.textContent = isExpanded ? '공사명 접기' : '공사명 보기';
+        header.appendChild(right);
+        header.addEventListener('click', (e) => {
+          e.stopPropagation();
+          calCompanyExpandedByCell[cellKey] = !isExpanded;
+          refreshCalendars();
+        });
+        cell.appendChild(header);
+
+        if(isExpanded){
+          group.sites.forEach(s => {
+            const ev = document.createElement('div');
+            ev.className = 'cal-event cal-event-site ' + (eventClass || '');
+            ev.style.cssText = 'background:' + s.color + ';color:#fff;margin-top:3px;cursor:pointer;';
+            ev.innerHTML = '<span class="cal-event-name">' + escapeHtml(s.siteName) + '</span>' + (s.latestDisplay ? '<span class="cal-event-sub" style="opacity:.85;">' + escapeHtml(s.latestDisplay) + '</span>' : '');
+            ev.title = s.siteName + (s.latestDisplay ? ' · ' + s.latestDisplay : '');
+            const key = eventKey(storeKeyName, s.siteName, dateStr);
+            if(selectedEvents.some(sel => sel.key === key)) ev.classList.add('selected');
+            ev.addEventListener('click', (e) => {
+              e.stopPropagation();
+              if(e.ctrlKey || e.metaKey){
+                const idx = selectedEvents.findIndex(sel => sel.key === key);
+                if(idx >= 0){ selectedEvents.splice(idx,1); ev.classList.remove('selected'); }
+                else { selectedEvents.push({key, store:storeKeyName, site:s.siteName, date:dateStr}); ev.classList.add('selected'); }
+              } else if(selectedEvents.length === 1 && selectedEvents[0].key === key){
+                clearSelection();
+              } else {
+                clearSelection();
+                selectedEvents.push({key, store:storeKeyName, site:s.siteName, date:dateStr});
+                ev.classList.add('selected');
+              }
+              updateSelectionBar();
+            });
+            ev.addEventListener('dblclick', (e) => { e.stopPropagation(); openDetailByName(s.siteName); });
+            ev.addEventListener('contextmenu', (e) => showContextMenu(e, s.siteName, storeKeyName, dateStr));
+            ev.addEventListener('dragstart', (e) => {
+              e.stopPropagation();
+              const isCopy = e.ctrlKey || e.metaKey;
+              const key2 = eventKey(storeKeyName, s.siteName, dateStr);
+              let payloadEvents = selectedEvents.some(sel => sel.key === key2) ? selectedEvents.slice() : [{key:key2, store:storeKeyName, site:s.siteName, date:dateStr}];
+              e.dataTransfer.setData('text/plain', JSON.stringify({mode:isCopy?'copy':'move', events:payloadEvents}));
+            });
+            cell.appendChild(ev);
+          });
+        }
+      });
+
+      cell.addEventListener('click', (event) => {
+        if(selectedSideCard && (event.target === cell || event.target.classList.contains('date-num') || event.target.classList.contains('holiday-badge'))){ insertSelectedSideCardToDate(dateStr); return; }
+        if(selectedEvents.length > 0 && (event.target === cell || event.target.classList.contains('date-num') || event.target.classList.contains('holiday-badge'))){ moveSelectedEventsToDate(dateStr); return; }
+        if(event.target === cell || event.target.classList.contains('date-num')) clearSelection();
+        lastFocusedCellDate = dateStr; lastFocusedGridId = gridId; refreshCalendars();
+      });
+      cell.addEventListener('dragover', event => { event.preventDefault(); cell.classList.add('drag-over'); });
+      cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+      cell.addEventListener('drop', event => {
+        event.preventDefault(); cell.classList.remove('drag-over');
+        let data = null;
+        try{ data = JSON.parse(event.dataTransfer.getData('text/plain')); }catch(err){ data = selectedSideCard; }
+        if(!data && selectedSideCard) data = selectedSideCard;
+        if(!data) return;
+        if(data.mode === 'new'){
+          addSiteScheduleWithSync(data.site, data.store, dateStr);
+          setSelectedSideCard(null, null);
+        } else if(data.mode === 'copy'){
+          (async()=>{ for(const ev of (data.events||[])){ await addSiteScheduleWithSync(ev.site, ev.store, dateStr); } clearSelection(); })();
+        } else {
+          const syncTasks = [];
+          (data.events || []).forEach(ev => {
+            const targetStore = ev.store === 'visit' ? visitStore : contactStore;
+            const arr = targetStore[ev.site] || [];
+            const idx = arr.indexOf(ev.date);
+            if(idx >= 0) arr.splice(idx,1);
+            if(!arr.includes(dateStr)) arr.push(dateStr);
+            targetStore[ev.site] = arr;
+            syncTasks.push(() => syncMoveDate(ev.store, ev.site, ev.date, dateStr));
+          });
+          saveStore(data.events && data.events[0] && data.events[0].store === 'visit' ? STORE_KEY : CONTACT_KEY, data.events && data.events[0] && data.events[0].store === 'visit' ? visitStore : contactStore);
+          clearSelection();
+          refreshCalendars(); renderDashboard(); renderStatsTable(); renderContractsTable();
+          syncTasks.forEach(task => task());
+        }
+      });
+      grid.appendChild(cell);
+    }
+  }
+
+  window.renderCalendarGrid = renderCalendarGridWithCompanyGrouping;
+  if(typeof window.renderCalendarWorkbench === 'function'){
+    window.renderCalendarWorkbench();
+  }
+  if(typeof refreshCalendars === 'function'){
+    refreshCalendars();
+  }
+
+  // 스크롤 보존: 상세 모달 열기/닫기 시 페이지 스크롤 위치 유지
+  let detailOpenScrollY = null;
+  const originalOpenDetail = window.openDetailByName;
+  window.openDetailByName = function(name){
+    detailOpenScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    const result = originalOpenDetail ? originalOpenDetail.apply(this, arguments) : undefined;
+    requestAnimationFrame(() => {
+      if(detailOpenScrollY !== null) window.scrollTo({ top: detailOpenScrollY, left: 0, behavior: 'auto' });
+      try {
+        const scrollShell = document.querySelector('#detail-modal .detail-scroll-shell');
+        if(scrollShell) scrollShell.scrollTop = 0;
+        const modalScroll = document.querySelector('#detail-modal .modal-box');
+        if(modalScroll) modalScroll.scrollTop = 0;
+      } catch(e) {}
+    });
+    return result;
+  };
+  const originalCloseDetail = closeDetail;
+  closeDetail = async function(){
+    if(modal && modal.contains(document.activeElement) && document.activeElement?.blur) document.activeElement.blur();
+    if(typeof originalCloseDetail === 'function') await originalCloseDetail.apply(this, arguments);
+    const restoreY = detailOpenScrollY;
+    if(restoreY !== null){
+      requestAnimationFrame(() => { window.scrollTo({ top: restoreY, left: 0, behavior: 'auto' }); });
+      detailOpenScrollY = null;
+    }
+  };
 })();
 
 </script>
