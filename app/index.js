@@ -18,6 +18,46 @@ const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
 const NON_COPYABLE_TYPES = ['formula', 'rollup', 'created_time', 'created_by', 'last_edited_time', 'last_edited_by', 'unique_id'];
 const PERSONAL_DIRECT_COMPANY_NAMES = ['개인직영공사'];
+const COMPLETED_CHECKBOX_CANDIDATES = ['공사완료', '공사 완료', '완료', 'completed'];
+const COMPLETED_STATUS_KEYWORDS = ['완료', '준공완료', '공사완료', '종료', '종결'];
+
+function isCompletedByCheckbox(properties) {
+  if (!properties) return false;
+  for (const cand of COMPLETED_CHECKBOX_CANDIDATES) {
+    const key = findPropertyKey(properties, [cand]);
+    if (!key) continue;
+    const prop = properties[key];
+    if (!prop) continue;
+    if (prop.type === 'checkbox') return Boolean(prop.checkbox);
+    if (prop.type === 'status' || prop.type === 'select') {
+      const v = (prop.status && prop.status.name) || (prop.select && prop.select.name) || '';
+      return COMPLETED_STATUS_KEYWORDS.some(k => String(v).replace(/\s+/g,'').includes(k));
+    }
+    if (prop.type === 'rich_text' || prop.type === 'title') {
+      const txt = plainTextFromArray(prop.rich_text || prop.title || []).trim();
+      return COMPLETED_STATUS_KEYWORDS.some(k => txt.replace(/\s+/g,'').includes(k));
+    }
+  }
+  return false;
+}
+
+function isCompletedByStatusValue(value) {
+  const v = String(value || '').replace(/\s+/g,'');
+  return COMPLETED_STATUS_KEYWORDS.some(k => v.includes(k));
+}
+
+function isPageCompleted(page) {
+  const p = page.properties || {};
+  if (isCompletedByCheckbox(p)) return true;
+  const statusVal = getPropertyStatus(p, ['작업 여부', '상태']);
+  return isCompletedByStatusValue(statusVal);
+}
+
+function buildCompletedSiteNameSet(rawSites) {
+  const set = new Set();
+  rawSites.forEach(s => { if (s && s.__completed) set.add(s.name); });
+  return set;
+}
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'safety-dashboard.html'));
@@ -136,6 +176,8 @@ function extractPeopleFromProperties(properties) {
 function pageToSite(page) {
   const p = page.properties || {};
   const managerEntries = extractPeopleFromProperties(p);
+  const statusVal = getPropertyStatus(p, ['작업 여부', '상태']);
+  const completedFlag = isPageCompleted(page) || isCompletedByStatusValue(statusVal);
   return {
     id: page.id,
     name: getPropertyString(p, ['공사명', '현장명']) || '이름없음',
@@ -151,7 +193,7 @@ function pageToSite(page) {
     contractDate: getPropertyDate(p, ['계약일']),
     amount: getPropertyNumber(p, ['계약금액(VAT 포함)', '공사금액', '계약금액(VAT자동 계산)']) || 0,
     contactRequest: getPropertyDate(p, ['연락요청 일자', '연락요청일자']),
-    status: getPropertyStatus(p, ['작업 여부', '상태']),
+    status: statusVal,
     note: getPropertyString(p, ['비고']),
     site: getPropertyString(p, ['사이트', '지역']),
     manager: getPropertyString(p, ['감독자', '담당자']) || '',
@@ -162,7 +204,8 @@ function pageToSite(page) {
     mgmtNo: getPropertyString(p, ['관리번호']),
     lastEdited: page.last_edited_time,
     createdAt: getPropertyDate(p, ['생성 일시']) || page.created_time,
-    rawProperties: p
+    rawProperties: p,
+    __completed: completedFlag
   };
 }
 function groupSites(rawSites) {
@@ -354,8 +397,11 @@ app.get('/api/contracts', async (req, res) => {
     if (!DB_ID) throw new Error('NOTION_DATABASE_ID not set');
     const results = await queryAllPages(DB_ID);
     const rawSites = results.map(pageToSite);
-    const sites = groupSites(rawSites);
-    res.json({ ok: true, count: sites.length, rawCount: rawSites.length, sites });
+    const completedNames = buildCompletedSiteNameSet(rawSites);
+    const filteredRawSites = rawSites.filter(s => !completedNames.has(s.name));
+    const sites = groupSites(filteredRawSites).map(s => ({ ...s, completed: false }));
+    const excluded = rawSites.length - filteredRawSites.length;
+    res.json({ ok: true, count: sites.length, rawCount: rawSites.length, excludedByCompletion: excluded, completedSiteNames: Array.from(completedNames), sites });
   } catch (err) {
     console.error('contracts error:', err);
     res.status(500).json({ ok: false, error: err.message });
