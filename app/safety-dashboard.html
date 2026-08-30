@@ -1451,7 +1451,8 @@ let kpiListData=[];
 function openKpiList(kind){ let title='',list=[]; if(kind==='total'){ title='전체 현장 ('+sites.length+')'; list=sites.map(s=>({name:s.name,sub:s.company})); } else if(kind==='unvisited'){ const arr=getUnvisitedThisMonth(); title='이번달 미방문 ('+arr.length+')'; list=arr.map(s=>({name:s.name,sub:s.company+' · '+countThisMonth(visitStore[s.name])+'/'+MONTHLY_TARGET+' 방문'})); } else if(kind==='never'){ const arr=getNeverVisited(); title='1회도 방문없음 ('+arr.length+')'; list=arr.map(s=>({name:s.name,sub:s.company})); } else if(kind==='monthly-visits'){ const arr=sites.filter(s=>countThisMonth(visitStore[s.name])>0); title='이번달 방문 현장 (총 '+arr.reduce((sum,s)=>sum+countThisMonth(visitStore[s.name]),0)+'회)'; list=arr.map(s=>({name:s.name,sub:s.company+' · '+countThisMonth(visitStore[s.name])+'회 방문',region:s.site||s.region||'',site:s.site||s.region||''})); } else if(kind==='completion'){ const arr=getCompletionSoon(); title='준공 임박 30일 이내 ('+arr.length+')'; list=arr.map(s=>({name:s.name,sub:s.company+' · D-'+daysUntil(s.end)+' (준공: '+s.end+')'})); } kpiListData=list; document.getElementById('kpi-list-title').textContent=title; document.getElementById('kpi-list-search').value=''; const box=document.getElementById('kpi-list-box'); box.classList.remove('kpi-box-red','kpi-box-gray'); if(kind==='completion') box.classList.add('kpi-box-red'); if(kind==='never') box.classList.add('kpi-box-gray'); renderKpiListBody(list); document.getElementById('kpi-list-modal').classList.add('active'); }
 function renderKpiListBody(list, total){
   const body=document.getElementById('kpi-list-body');
-  const cntTxt = (total !== undefined) ? ('표시 ' + list.length + ' / 전체 ' + total + '건') : ('총 ' + list.length + '건');
+  const vSum=(list||[]).reduce((a,i)=>a+(i.visits||0),0);
+  const cntTxt = (total !== undefined) ? ('표시 ' + list.length + ' / 전체 ' + total + '건' + (vSum?' · 방문 '+vSum+'회':'')) : ('총 ' + list.length + '건' + (vSum?' · 방문 '+vSum+'회':''));
   const cntDiv = '<div style="font-size:12px;color:#475569;font-weight:800;margin-bottom:6px;padding:6px 10px;background:#f1f5f9;border-radius:6px;">' + cntTxt + '</div>';
   const rows = list.map(item=>'<div class="kpi-list-row" onclick="closeKpiList();openDetailByName(\''+item.name+'\')"><strong>'+item.name+'</strong><span>'+item.sub+(item.region?' · '+item.region:'')+'</span></div>').join('');
   body.innerHTML = cntDiv + (list.length ? rows : '<div style="color:#94a3b8;font-size:13px;">검색 결과가 없습니다</div>');
@@ -2854,8 +2855,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function getMonthlyCompletedSites(){
     return dedupeSitesByName(Array.isArray(sites) ? sites : []).filter(site => {
-      if(!isCompletedSite(site) || !site.end) return false;
-      const dt = new Date(site.end);
+      if(!isCompletedSite(site)) return false;
+      const ref = site.completedAt || (site.lastEdited ? String(site.lastEdited).slice(0,10) : null) || site.end;
+      if(!ref) return false;
+      const dt = new Date(ref);
       return dt.getFullYear() === curYear && dt.getMonth() === curMonth;
     });
   }
@@ -3082,7 +3085,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('kpi-unvisited').textContent = getUnvisitedThisMonth().length;
     document.getElementById('kpi-never').textContent = getNeverVisited().length;
     document.getElementById('kpi-completion').textContent = getCompletionSoon().length;
-    document.getElementById('kpi-monthly-visits').textContent = activeSites.reduce((sum, site) => sum + countThisMonth(visitStore[site.name]), 0);
+    const allSitesForVisits = dedupeSitesByName(sites);
+    document.getElementById('kpi-monthly-visits').textContent = allSitesForVisits.reduce((sum, site) => sum + countThisMonth(visitStore[site.name]), 0);
     const missing = document.getElementById('kpi-contact-missing');
     if(missing) missing.textContent = getContactMissingSites().filter(site => !isCompletedSite(site)).length;
     const completedMonthly = document.getElementById('kpi-completed-month');
@@ -3248,33 +3252,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       grid.appendChild(cell);
     }
-    [1,2,3,4,5].forEach(idx => {
-      const cell = document.createElement('div');
-      cell.className = 'ai-day';
-      const head = document.createElement('div');
-      head.className = 'd-label';
-      head.textContent = weekDays[idx];
-      cell.appendChild(head);
-      if((plan[idx] || []).length){
-        (plan[idx] || []).forEach(target => {
-          const cls = target.never ? 'ai-visit-chip chip-never' : (target.isHyundai ? 'ai-visit-chip chip-hyundai' : 'ai-visit-chip chip-normal');
-          const chip = document.createElement('div');
-          chip.className = cls;
-          chip.style.cursor = 'pointer';
-          chip.textContent = target.name;
-          chip.title = target.name;
-          chip.addEventListener('click',()=>openDetailByName(target.name));
-          if(target.note){ const flag = document.createElement('span'); flag.className='note-flag'; flag.style.width='14px'; flag.style.height='14px'; flag.style.fontSize='10px'; flag.textContent='!'; chip.appendChild(flag); }
-          cell.appendChild(chip);
-        });
-      } else {
-        const empty = document.createElement('div');
-        empty.style.cssText = 'font-size:12px;color:#94a3b8;';
-        empty.textContent = '예정 없음';
-        cell.appendChild(empty);
-      }
-      grid.appendChild(cell);
-    });
+
   };
   window.renderDashboard = function(){
     refreshKPIs();
@@ -3328,10 +3306,12 @@ document.addEventListener('DOMContentLoaded', () => {
       list = buildCompanyKpiList(arr, bucket => '1회도 방문 없는 공사 ' + bucket.contractNames.length + '건', kind);
       title = '1회도 방문없음 · 공사 ' + arr.length + '건 / 회사 ' + list.length + '곳';
     } else if(kind === 'monthly-visits'){
-      const arr = activeSites.filter(site => countThisMonth(visitStore[site.name]) > 0);
+      const allSitesForVisits = dedupeSitesByName(sites);
+      const arr = allSitesForVisits.filter(site => countThisMonth(visitStore[site.name]) > 0);
       const totalVisits = arr.reduce((sum, site) => sum + countThisMonth(visitStore[site.name]), 0);
-      list = buildCompanyKpiList(arr, bucket => '이번달 방문 ' + bucket.monthlyVisits + '회 · 공사 ' + bucket.contractNames.length + '건', kind);
-      title = '이번달 총 방문횟수 · ' + totalVisits + '회 / 회사 ' + list.length + '곳';
+      list = arr.map(site => ({ name: site.name, sub: (site.company||'-') + ' · ' + countThisMonth(visitStore[site.name]) + '회 방문', region: site.site || site.region || '', site: site.site || site.region || '', visits: countThisMonth(visitStore[site.name]) }));
+      title = '이번달 총 방문횟수 · ' + totalVisits + '회 / ' + arr.length + '건';
+      subtitle = '지역(예: 당진) 검색 가능. 검색 시 상단에 방문횟수 표시.';
     } else if(kind === 'completion'){
       const arr = getCompletionSoon();
       list = buildCompanyKpiList(arr, bucket => '준공 임박 공사 ' + bucket.contractNames.length + '건' + (bucket.closestCompletion !== null ? ' · 가장 빠른 D-' + bucket.closestCompletion : ''), kind);
@@ -3341,11 +3321,10 @@ document.addEventListener('DOMContentLoaded', () => {
       list = buildCompanyKpiList(arr, bucket => '연락요청·비고 없는 공사 ' + bucket.contractNames.length + '건', kind);
       title = '긴급 연락 필요 · 공사 ' + arr.length + '건 / 회사 ' + list.length + '곳';
       subtitle = '연락요청 일정도 없고 비고도 없는 진행중 공사만 모았습니다. 회사명을 누르면 해당 공사 목록이 열립니다.';
-    } else if(kind === 'completed-month'){
-      const arr = getMonthlyCompletedSites();
-      list = arr.map(s=>({name:s.name, sub:(s.company||'-')+' · 준공 '+(s.end||'-'), region:s.site||s.region||'', site:s.site||s.region||''}));
+    } else if(kind === 'completed-month'){      const arr = getMonthlyCompletedSites();
+      list = arr.map(site => ({ name: site.name, sub: (site.company||'-') + ' · 완료체크 ' + (site.completedAt || (site.lastEdited ? String(site.lastEdited).slice(0,10) : '') || site.end || '-'), region: site.site || site.region || '', site: site.site || site.region || '' }));
       title = '이번달 공사완료 · ' + arr.length + '건';
-      subtitle = '체크박스 + 상태 컬럼 통합 인식. 지역 검색 가능.';
+      subtitle = '완료 체크(마지막 수정일) 기준 이번달 집계. 지역 검색 가능.';
     }
     kpiListData = list;
     document.getElementById('kpi-list-title').textContent = title;
