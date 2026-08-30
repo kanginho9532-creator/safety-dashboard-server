@@ -492,7 +492,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
         <div class="kpi kpi-green" onclick="openKpiList('monthly-visits')"><div class="label">이번달 총 방문횟수</div><div class="value" id="kpi-monthly-visits">-</div></div>
         <div class="kpi kpi-purple" onclick="openKpiList('completion')"><div class="label">준공 임박(30일)</div><div class="value" id="kpi-completion">-</div></div>
         <div class="kpi kpi-amber" onclick="openKpiList('contact-missing')"><div class="label">연락요청·비고 없음</div><div class="value" id="kpi-contact-missing">-</div></div>
-        <div class="kpi kpi-slate" onclick="openKpiList('completed-month')"><div class="label">이번달 공사완료</div><div class="value" id="kpi-completed-month">-</div></div>
+        <div class="kpi kpi-slate" onclick="openKpiList('completed-month')"><div class="label">전체 공사완료</div><div class="value" id="kpi-completed-month">-</div></div>
       </div>
       <div class="dash-two-col">
         <div class="panel dash-scroll">
@@ -734,8 +734,8 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
     <button class="modal-close" onclick="closeKpiList()">✕</button>
     <h3 id="kpi-list-title">-</h3>
     <div id="kpi-list-subtitle" style="margin-top:6px;color:var(--muted);font-size:12px;line-height:1.5;">회사명을 누르면 해당 공사 목록이 열립니다.</div>
-    <input type="text" id="kpi-list-search" placeholder="🔍 공사명/회사명 검색" style="width:100%;box-sizing:border-box;padding:9px 12px;margin-top:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;" oninput="filterKpiList()">
-    <div id="kpi-list-body" style="margin-top:12px;max-height:55vh;overflow-y:auto;"></div>
+    <input type="text" id="kpi-list-search" placeholder="🔍 공사명/회사명/지역 검색" style="width:100%;box-sizing:border-box;padding:9px 12px;margin-top:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;" oninput="filterKpiList()">
+    <div id="kpi-list-body" style="margin-top:12px;max-height:72vh;overflow-y:auto;"></div>
   </div>
 </div>
 
@@ -2481,9 +2481,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
   window.filterKpiList = function(){
-    const q = (document.getElementById('kpi-list-search').value || '').trim().toLowerCase();
-    const filtered = (kpiListData || []).filter(item => [item.name, item.sub, item.keywords].join(' ').toLowerCase().includes(q));
-    renderKpiListBody(filtered);
+    const raw = (document.getElementById('kpi-list-search').value || '').trim();
+    const norm = v => String(v || '').normalize('NFC').replace(/[\s\u00A0()\[\]·,._\-\/\\'`"~!@#$%^&*+=|:<>?]/g, '').toLowerCase();
+    const q = norm(raw);
+    if(!raw){ renderKpiListBody(kpiListData || [], (kpiListData || []).length); return; }
+    const filtered = (kpiListData || []).filter(item => {
+      const hay = norm(item.name + ' ' + (item.sub || '') + ' ' + (item.region || '') + ' ' + (item.site || '') + ' ' + (item.keywords || ''));
+      return hay.includes(q);
+    });
+    renderKpiListBody(filtered, (kpiListData || []).length);
   };
   window.openKpiList = function(kind){
     const uniqueSites = getUniqueSites();
@@ -2758,19 +2764,20 @@ document.addEventListener('DOMContentLoaded', () => {
         keywords: [bucket.displayName, bucket.companyName].concat(bucket.contractNames).join(' ')
       }));
   };
-  window.renderKpiListBody = function(list){
+  window.renderKpiListBody = function(list, total){
     const body = document.getElementById('kpi-list-body');
     if(!body) return;
-    body.innerHTML = '';
-    if(!list || !list.length){
-      body.innerHTML = '<div style="color:#94a3b8;font-size:13px;">검색 결과가 없습니다</div>';
-      return;
-    }
-    list.forEach(item => {
+    const arr = list || [];
+    const vSum = arr.reduce((a, i) => a + (i.visits || 0), 0);
+    const cntTxt = (total !== undefined) ? ('표시 ' + arr.length + ' / 전체 ' + total + '건' + (vSum ? ' · 방문 ' + vSum + '회' : '')) : ('총 ' + arr.length + '건' + (vSum ? ' · 방문 ' + vSum + '회' : ''));
+    const cntDiv = '<div style="font-size:12px;color:#475569;font-weight:800;margin-bottom:6px;padding:6px 10px;background:#f1f5f9;border-radius:6px;">' + cntTxt + '</div>';
+    body.innerHTML = cntDiv;
+    if(!arr.length){ body.innerHTML += '<div style="color:#94a3b8;font-size:13px;">검색 결과가 없습니다</div>'; return; }
+    arr.forEach(item => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'kpi-list-row kpi-list-button';
-      button.innerHTML = '<strong>' + escapeHtml(item.name || '-') + '</strong><span>' + escapeHtml(item.sub || '') + '</span>';
+      button.innerHTML = '<strong>' + escapeHtml(item.name || '-') + '</strong><span>' + escapeHtml(item.sub || '') + (item.region ? ' · ' + escapeHtml(item.region) : '') + '</span>';
       button.addEventListener('click', () => {
         if(item.type === 'company') openCompanyModalByName(item.key || item.name, { contractNames: item.contractNames || [], sourceKind: item.sourceKind || '' });
         else openDetailByName(item.name);
@@ -3080,8 +3087,8 @@ document.addEventListener('DOMContentLoaded', () => {
     return getDashboardSites().filter(site => site.end && daysUntil(site.end) >= 0 && daysUntil(site.end) <= 30 ).sort((a,b)=>daysUntil(a.end)-daysUntil(b.end));
   };
   window.refreshKPIs = function(){
-    const activeSites = getDashboardSites();
-    document.getElementById('kpi-total').textContent = activeSites.length;
+    const allSites = dedupeSitesByName(sites);
+    document.getElementById('kpi-total').textContent = allSites.length;
     document.getElementById('kpi-unvisited').textContent = getUnvisitedThisMonth().length;
     document.getElementById('kpi-never').textContent = getNeverVisited().length;
     document.getElementById('kpi-completion').textContent = getCompletionSoon().length;
@@ -3090,7 +3097,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const missing = document.getElementById('kpi-contact-missing');
     if(missing) missing.textContent = getContactMissingSites().filter(site => !isCompletedSite(site)).length;
     const completedMonthly = document.getElementById('kpi-completed-month');
-    if(completedMonthly) completedMonthly.textContent = getMonthlyCompletedSites().length;
+    if(completedMonthly) completedMonthly.textContent = allSites.filter(isCompletedSite).length;
   };
   window.renderCompletionList = function(){
     const completionSoon = getCompletionSoon();
@@ -3218,8 +3225,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const sitesArr = (typeof dedupeSitesByName==='function' ? dedupeSitesByName(window.sites||[]) : (window.sites||[]));
     sitesArr.forEach(site=>{
-      const dates = (typeof visitStore!=='undefined' ? (visitStore[site.name]||[]) : []);
-      dates.forEach(d=>{
+      const fromStore = (typeof visitStore!=='undefined' ? (visitStore[site.name]||[]) : []);
+      const fromSite = (site.visitDates && site.visitDates.length) ? site.visitDates : [];
+      const merged = Array.from(new Set([...fromStore, ...fromSite]));
+      merged.forEach(d=>{
         const ds = String(d).slice(0,10);
         if(dayMap[ds]) dayMap[ds].items.push(site);
       });
@@ -3251,6 +3260,13 @@ document.addEventListener('DOMContentLoaded', () => {
         cell.appendChild(empty);
       }
       grid.appendChild(cell);
+    }
+    const anyItem = Object.keys(dayMap).some(k => dayMap[k].items.length);
+    if(!anyItem){
+      const note = document.createElement('div');
+      note.style.cssText = 'grid-column:1/-1;font-size:12px;color:#94a3b8;padding:8px;';
+      note.textContent = '이번 주 노션 방문일정이 없습니다. (Notion 동기화 후 방문일자 데이터가 표시됩니다)';
+      grid.appendChild(note);
     }
 
   };
@@ -3295,8 +3311,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let subtitle = '회사명을 누르면 해당 공사 목록이 열립니다.';
     let list = [];
     if(kind === 'total'){
-      list = buildCompanyKpiList(activeSites, bucket => '공사 ' + bucket.contractNames.length + '건', kind);
-      title = '전체 현장 · 공사 ' + activeSites.length + '건 / 회사 ' + list.length + '곳';
+      const allSites = dedupeSitesByName(sites);
+      list = buildCompanyKpiList(allSites, bucket => '공사 ' + bucket.contractNames.length + '건', kind);
+      title = '전체 현장 · 공사 ' + allSites.length + '건 / 회사 ' + list.length + '곳';
     } else if(kind === 'unvisited'){
       const arr = getUnvisitedThisMonth();
       list = buildCompanyKpiList(arr, bucket => '이번달 미방문 공사 ' + bucket.contractNames.length + '건', kind);
@@ -3321,10 +3338,12 @@ document.addEventListener('DOMContentLoaded', () => {
       list = buildCompanyKpiList(arr, bucket => '연락요청·비고 없는 공사 ' + bucket.contractNames.length + '건', kind);
       title = '긴급 연락 필요 · 공사 ' + arr.length + '건 / 회사 ' + list.length + '곳';
       subtitle = '연락요청 일정도 없고 비고도 없는 진행중 공사만 모았습니다. 회사명을 누르면 해당 공사 목록이 열립니다.';
-    } else if(kind === 'completed-month'){      const arr = getMonthlyCompletedSites();
+    } else if(kind === 'completed-month'){
+      const allSites = dedupeSitesByName(sites);
+      const arr = allSites.filter(isCompletedSite);
       list = arr.map(site => ({ name: site.name, sub: (site.company||'-') + ' · 완료체크 ' + (site.completedAt || (site.lastEdited ? String(site.lastEdited).slice(0,10) : '') || site.end || '-'), region: site.site || site.region || '', site: site.site || site.region || '' }));
-      title = '이번달 공사완료 · ' + arr.length + '건';
-      subtitle = '완료 체크(마지막 수정일) 기준 이번달 집계. 지역 검색 가능.';
+      title = '전체 공사완료 · ' + arr.length + '건';
+      subtitle = '완료 체크된 전체 공사 목록. 지역 검색 가능.';
     }
     kpiListData = list;
     document.getElementById('kpi-list-title').textContent = title;
@@ -3334,7 +3353,7 @@ document.addEventListener('DOMContentLoaded', () => {
     box.classList.remove('kpi-box-red','kpi-box-gray');
     if(kind === 'completion') box.classList.add('kpi-box-red');
     if(kind === 'never') box.classList.add('kpi-box-gray');
-    renderKpiListBody(list);
+    renderKpiListBody(list, list.length);
     showModalFront('kpi-list-modal');
   };
   async function addSiteScheduleWithSync(siteName, storeType, dateStr, options = {}){
