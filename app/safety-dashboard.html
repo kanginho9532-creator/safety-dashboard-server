@@ -4317,29 +4317,72 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 스크롤 보존: 상세 모달 열기/닫기 시 페이지 스크롤 위치 유지
+  // - 열 때: 현재 scrollY 저장 + body를 position:fixed;top:-Y로 잠금 (오프셋 손실 X)
+  // - 닫을 때: body 잠금 해제 + 즉시 scrollTo로 저장된 위치 복원 (rAF 대기 X)
+  // - 추가로 모달 내 어떤 포커스도 preventScroll:true로 자동 스크롤 방지
   let detailOpenScrollY = null;
   const originalOpenDetail = window.openDetailByName;
   window.openDetailByName = function(name){
-    detailOpenScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    detailOpenScrollY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
     const result = originalOpenDetail ? originalOpenDetail.apply(this, arguments) : undefined;
-    requestAnimationFrame(() => {
-      if(detailOpenScrollY !== null) window.scrollTo({ top: detailOpenScrollY, left: 0, behavior: 'auto' });
+    try {
+      // body 잠금 (오프셋 보존)
+      const b = document.body;
+      b.dataset.scrollLockY = String(detailOpenScrollY);
+      b.dataset.scrollLockPrevPosition = b.style.position || '';
+      b.dataset.scrollLockPrevTop = b.style.top || '';
+      b.dataset.scrollLockPrevWidth = b.style.width || '';
+      b.dataset.scrollLockPrevOverflow = b.style.overflowY || '';
+      b.style.position = 'fixed';
+      b.style.top = '-' + detailOpenScrollY + 'px';
+      b.style.left = '0';
+      b.style.right = '0';
+      b.style.width = '100%';
+      b.style.overflowY = 'scroll';
+      // 모달 내부 컨테이너는 항상 상단으로
       try {
         const scrollShell = document.querySelector('#detail-modal .detail-scroll-shell');
         if(scrollShell) scrollShell.scrollTop = 0;
         const modalScroll = document.querySelector('#detail-modal .modal-box');
         if(modalScroll) modalScroll.scrollTop = 0;
-      } catch(e) {}
-    });
+      } catch(_e) {}
+      // 모달 내 자동 포커스가 스크롤을 점프하지 않게 (preventScroll)
+      try {
+        const modalEl = document.getElementById('detail-modal');
+        if(modalEl && modalEl.contains(document.activeElement) && document.activeElement && document.activeElement.blur){
+          document.activeElement.blur({ preventScroll: true });
+        }
+      } catch(_e) {}
+    } catch(_e) {}
     return result;
   };
   const originalCloseDetail = closeDetail;
   closeDetail = async function(){
-    try { const m = document.getElementById('detail-modal'); if(m && m.contains(document.activeElement) && document.activeElement?.blur) document.activeElement.blur(); } catch(e){}
+    try {
+      const m = document.getElementById('detail-modal');
+      if(m && m.contains(document.activeElement) && document.activeElement && document.activeElement.blur){
+        document.activeElement.blur({ preventScroll: true });
+      }
+    } catch(_e) {}
     if(typeof originalCloseDetail === 'function') await originalCloseDetail.apply(this, arguments);
     const restoreY = detailOpenScrollY;
-    if(restoreY !== null){
-      requestAnimationFrame(() => { window.scrollTo({ top: restoreY, left: 0, behavior: 'auto' }); });
+    try {
+      // body 잠금 해제 (저장된 inline 스타일 복원)
+      const b = document.body;
+      b.style.position = b.dataset.scrollLockPrevPosition || '';
+      b.style.top = b.dataset.scrollLockPrevTop || '';
+      b.style.width = b.dataset.scrollLockPrevWidth || '';
+      b.style.overflowY = b.dataset.scrollLockPrevOverflow || '';
+      delete b.dataset.scrollLockY;
+      delete b.dataset.scrollLockPrevPosition;
+      delete b.dataset.scrollLockPrevTop;
+      delete b.dataset.scrollLockPrevWidth;
+      delete b.dataset.scrollLockPrevOverflow;
+    } catch(_e) {}
+    if(restoreY !== null && restoreY !== undefined){
+      // rAF 대기 없이 즉시 복원 — 다음 페인트에서 브라우저가 점프하지 못하게
+      window.scrollTo(0, restoreY);
+      requestAnimationFrame(() => { window.scrollTo(0, restoreY); });
       detailOpenScrollY = null;
     }
   };
