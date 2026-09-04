@@ -470,7 +470,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
     <h1>🦺 안전관리 대시보드</h1>
     <nav>
       <button class="tab-btn active" data-page="dashboard">대시보드</button>
-      <button class="tab-btn" data-page="stats">통계 분석</button>
+      <button class="tab-btn" data-page="schedule">작업 관리</button>
       <button class="tab-btn" data-page="contracts">계약관리</button>
       <button class="tab-btn" data-page="companies">회사명 카드</button>
       <button class="tab-btn" data-page="calendar">일정 캘린더</button>
@@ -514,10 +514,73 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
     </div>
 
 
-    <div class="page" id="stats">
+    <div class="page" id="schedule">
+<div class="schedule-board" style="padding:12px;">
+  <div class="schedule-board__header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <div>
+      <h2 style="margin:0 0 4px 0;font-size:20px;">🗓 작업 관리</h2>
+      <div style="color:#666;font-size:13px;">불시·일정 펑크 시 다른 현장에 즉시 연락해 충당할 수 있도록 5개 섹션으로 구분합니다.</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-secondary" onclick="renderScheduleBoard()">🔄 새로고침</button>
+      <button class="btn-secondary" onclick="openSuddenWorkModal()">⚡ 불시작업 추가</button>
+    </div>
+  </div>
+
+  <div class="schedule-section" id="section-daily" data-section="daily">
+    <h3>📅 매일 작업 <span class="badge" id="count-daily">0</span></h3>
+    <div class="section-cards" id="cards-daily"><div class="empty">오늘 예정된 작업이 없습니다.</div></div>
+  </div>
+
+  <div class="schedule-section" id="section-weekly" data-section="weekly">
+    <h3>🗓 주간 작업 <span class="badge" id="count-weekly">0</span></h3>
+    <div class="section-cards" id="cards-weekly"><div class="empty">이번주 예정된 작업이 없습니다.</div></div>
+  </div>
+
+  <div class="schedule-section" id="section-monthly" data-section="monthly">
+    <h3>📆 월간 작업 <span class="badge" id="count-monthly">0</span></h3>
+    <div class="section-cards" id="cards-monthly"><div class="empty">이번달 예정된 작업이 없습니다.</div></div>
+  </div>
+
+  <div class="schedule-section" id="section-sudden" data-section="sudden">
+    <h3>⚡ 불시 작업 <span class="badge" id="count-sudden">0</span></h3>
+    <div class="section-cards" id="cards-sudden"><div class="empty">등록된 불시 작업이 없습니다. 우측 상단 "불시작업 추가" 버튼으로 등록하세요.</div></div>
+  </div>
+
+  <div class="schedule-section" id="section-reply" data-section="reply">
+    <h3>📞 연락 회신 작업 <span class="badge" id="count-reply">0</span></h3>
+    <div class="section-cards" id="cards-reply"><div class="empty">최근 14일 내 연락 회신이 없습니다.</div></div>
+  </div>
+</div>
+<div id="sudden-work-modal" class="modal-overlay" onclick="if(event.target===this)closeSuddenWorkModal()">
+  <div class="modal-box" style="max-width:480px;">
+    <button class="modal-close" onclick="closeSuddenWorkModal()">✕</button>
+    <h3>⚡ 불시 작업 등록</h3>
+    <div style="margin:10px 0;">
+      <label>현장 선택</label>
+      <select id="sudden-site" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></select>
+    </div>
+    <div style="margin:10px 0;">
+      <label>작업 내용</label>
+      <textarea id="sudden-desc" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;min-height:60px;"></textarea>
+    </div>
+    <div style="margin:10px 0;">
+      <label>긴급도</label>
+      <select id="sudden-priority" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;">
+        <option value="urgent">🔴 긴급</option>
+        <option value="high">🟠 높음</option>
+        <option value="normal" selected>🟢 보통</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn-secondary" onclick="closeSuddenWorkModal()">취소</button>
+      <button class="btn-primary" onclick="submitSuddenWork()">등록 + 노션 동기화</button>
+    </div>
+  </div>
+</div>
       <div class="panel">
         <div class="table-toolbar">
-          <h3 style="margin:0;">통계 분석 - 월별 방문 현황 (헤더 틀고정)</h3>
+          <h3 style="margin:0;">작업 관리 - 일정 현황</h3>
           <input class="search-box" id="stats-search" placeholder="공사명/회사명 검색" onkeyup="renderStatsTable()">
           <select id="stats-sort" onchange="sortMode=this.value; renderStatsTable();" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;margin-left:8px;">
             <option value="lastEdited">최종 업데이트 순</option>
@@ -646,6 +709,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 <nav class="mobile-bottom-nav" aria-label="주요 메뉴">
   <button class="mobile-nav-item tab-btn active" data-page="dashboard"><span class="nav-icon">⌂</span><span>홈</span></button>
   <button class="mobile-nav-item tab-btn" data-page="contracts"><span class="nav-icon">▤</span><span>계약</span></button>
+  <button class="mobile-nav-item tab-btn" data-page="schedule"><span class="nav-icon">🗓</span><span>작업</span></button>
   <button class="mobile-nav-item tab-btn" data-page="calendar"><span class="nav-icon">□</span><span>일정</span></button>
   <button class="mobile-nav-item tab-btn" data-page="contact-calendar"><span class="nav-icon">◌</span><span>연락요청</span></button>
   <button class="mobile-nav-item tab-btn" data-page="companies"><span class="nav-icon">♙</span><span>업체</span></button>
@@ -908,7 +972,7 @@ function removePageIdForDate(storeType,siteName,date){ const map=getPageMap(stor
 function anyPageIdForSite(storeType,siteName){ const map=getPageMap(storeType); const arr=map[siteName]||[]; if(arr.length) return arr[0].pageId; const s=sites.find(x=>x.name===siteName); return s?s.notionId:null; }
 
 
-const MOBILE_PAGE_TITLES={dashboard:'대시보드',stats:'통계 분석',contracts:'계약관리',companies:'업체 카드',calendar:'일정 캘린더','contact-calendar':'연락요청'};
+const MOBILE_PAGE_TITLES={dashboard:'대시보드',schedule:'작업 관리',contracts:'계약관리',companies:'업체 카드',calendar:'일정 캘린더','contact-calendar':'연락요청'};
 function activateDashboardPage(pageId,updateUrl){
   if(!MOBILE_PAGE_TITLES[pageId]||!document.getElementById(pageId)) pageId='dashboard';
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===pageId));
@@ -1869,8 +1933,24 @@ function dedupeSitesByName(list){
   });
   return Array.from(map.values());
 }
-function getUnvisitedThisMonth(){ return dedupeSitesByName(sites).filter(s=> countThisMonth(visitStore[s.name]) < MONTHLY_TARGET ); }
-function getNeverVisited(){ return dedupeSitesByName(sites).filter(s=> s.visits===0 && (visitStore[s.name]||[]).length===0 ); }
+function getUnvisitedThisMonth(){
+  // 연락요청일자 OR 방문일자가 이번달(연·월 일치)인 현장만 포함
+  return dedupeSitesByName(sites).filter(s=>{
+    if(countThisMonth(visitStore[s.name]) >= MONTHLY_TARGET) return false;
+    const v=visitStore[s.name]||[]; const c=contactStore[s.name]||[];
+    const inMonth=arr=>arr.some(d=>{const dt=new Date(d); return dt.getFullYear()===curYear && dt.getMonth()===curMonth;});
+    return inMonth(v) || inMonth(c);
+  });
+}
+function getNeverVisited(){
+  // 연락요청일자 OR 방문일자가 이번달(연·월 일치)인 현장만 포함
+  return dedupeSitesByName(sites).filter(s=>{
+    if(!(s.visits===0 && (visitStore[s.name]||[]).length===0)) return false;
+    const v=visitStore[s.name]||[]; const c=contactStore[s.name]||[];
+    const inMonth=arr=>arr.some(d=>{const dt=new Date(d); return dt.getFullYear()===curYear && dt.getMonth()===curMonth;});
+    return inMonth(v) || inMonth(c);
+  });
+}
 function getCompletionSoon(){ return dedupeSitesByName(sites).filter(s=> s.end && daysUntil(s.end)>=0 && daysUntil(s.end)<=30 ).sort((a,b)=>daysUntil(a.end)-daysUntil(b.end)); }
 function refreshKPIs(){
   const uniqueSites = dedupeSitesByName(sites);
@@ -4361,6 +4441,63 @@ window.toggleCalendarCompanyView = function(gridId, btn){
       renderSideCards(tab==='contact' ? 'contact-unvisited-list' : 'unvisited-list', tab==='contact' ? 'contact-never-list' : 'never-list', tab);
     }
   }catch(e){ console.warn('toggle err:', e); }
+};
+
+window.__suddenWorkStore=window.__suddenWorkStore||[];
+window.renderScheduleBoard=function(){
+  try{
+    const today=new Date();
+    const todayStr=today.toISOString().slice(0,10);
+    const dow=today.getDay();
+    const monday=new Date(today); monday.setDate(today.getDate()-((dow+6)%7));
+    const sunday=new Date(monday); sunday.setDate(monday.getDate()+6);
+    const monthStart=new Date(today.getFullYear(),today.getMonth(),1);
+    const monthEnd=new Date(today.getFullYear(),today.getMonth()+1,0);
+    const replyStart=new Date(today); replyStart.setDate(today.getDate()-14);
+    const cardOf=(s,d,k)=>'<div class="schedule-card" onclick="openDetailByName(\''+s.name.replace(/'/g,"\\'")+'\')"><div class="card-title">'+s.name+'</div><div class="card-sub">'+s.company+'</div><div class="card-meta">'+k+' · '+d+'</div></div>';
+    const daily=[],weekly=[],monthly=[],reply=[];
+    (sites||[]).forEach(s=>{
+      (visitStore[s.name]||[]).forEach(d=>{
+        const ds=(d+'').slice(0,10);
+        if(ds===todayStr) daily.push({s,d,k:'방문'});
+        const dt=new Date(d);
+        if(dt>=monday&&dt<=sunday) weekly.push({s,d,k:'방문'});
+        if(dt>=monthStart&&dt<=monthEnd) monthly.push({s,d,k:'방문'});
+      });
+      (contactStore[s.name]||[]).forEach(d=>{
+        const ds=(d+'').slice(0,10);
+        if(ds===todayStr) daily.push({s,d,k:'연락'});
+        const dt=new Date(d);
+        if(dt>=replyStart&&dt<=today) reply.push({s,d,k:'회신'});
+      });
+    });
+    document.getElementById('cards-daily').innerHTML=daily.length?daily.map(x=>cardOf(x.s,x.d,x.k)).join(''):'<div class="empty">오늘 예정된 작업이 없습니다.</div>';
+    document.getElementById('count-daily').textContent=daily.length;
+    document.getElementById('cards-weekly').innerHTML=weekly.length?weekly.map(x=>cardOf(x.s,x.d,x.k)).join(''):'<div class="empty">이번주 예정된 작업이 없습니다.</div>';
+    document.getElementById('count-weekly').textContent=weekly.length;
+    document.getElementById('cards-monthly').innerHTML=monthly.length?monthly.map(x=>cardOf(x.s,x.d,x.k)).join(''):'<div class="empty">이번달 예정된 작업이 없습니다.</div>';
+    document.getElementById('count-monthly').textContent=monthly.length;
+    document.getElementById('cards-sudden').innerHTML=(window.__suddenWorkStore||[]).length?window.__suddenWorkStore.map(w=>'<div class="schedule-card sudden"><div class="card-title">⚡ '+w.siteName+'</div><div class="card-sub">'+w.priority+'</div><div class="card-meta">'+w.desc+'</div></div>').join(''):'<div class="empty">등록된 불시 작업이 없습니다.</div>';
+    document.getElementById('count-sudden').textContent=(window.__suddenWorkStore||[]).length;
+    document.getElementById('cards-reply').innerHTML=reply.length?reply.map(x=>cardOf(x.s,x.d,x.k)).join(''):'<div class="empty">최근 14일 내 연락 회신이 없습니다.</div>';
+    document.getElementById('count-reply').textContent=reply.length;
+  }catch(e){console.error('renderScheduleBoard',e);}
+};
+window.openSuddenWorkModal=function(){
+  const sel=document.getElementById('sudden-site');
+  sel.innerHTML=(sites||[]).map(s=>'<option value="'+s.name+'">'+s.name+' ('+s.company+')</option>').join('');
+  document.getElementById('sudden-work-modal').classList.add('active');
+};
+window.closeSuddenWorkModal=function(){document.getElementById('sudden-work-modal').classList.remove('active');};
+window.submitSuddenWork=function(){
+  const sn=document.getElementById('sudden-site').value;
+  const desc=document.getElementById('sudden-desc').value.trim();
+  const pr=document.getElementById('sudden-priority').value;
+  if(!sn||!desc){alert('현장과 내용을 입력하세요');return;}
+  window.__suddenWorkStore.push({siteName:sn,desc:desc,priority:pr,ts:Date.now()});
+  closeSuddenWorkModal();
+  renderScheduleBoard();
+  if(typeof fetch==='function'){fetch('/api/ai-command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'sudden-work',siteName:sn,desc:desc,priority:pr})}).catch(()=>{});}
 };
 </script></body>
 </html>
