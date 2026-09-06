@@ -481,6 +481,12 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 .schedule-section{margin-bottom:0;height:100%;display:flex;flex-direction:column;}
 .section-cards{display:flex;flex-direction:column;gap:8px;flex:1;}
 .section-cards > *{max-width:100%;white-space:normal;}
+.schedule-card.picked{outline:3px solid #2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.2);}
+.section-cards.move-target{cursor:pointer;}
+.section-cards.move-target:hover{background:rgba(37,99,235,.05);outline:2px dashed #93c5fd;border-radius:10px;}
+.schedule-move-bar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 16px;border-radius:999px;font-size:13px;font-weight:700;z-index:650;display:none;gap:10px;align-items:center;box-shadow:0 8px 22px rgba(15,23,42,.3);}
+.schedule-move-bar.show{display:flex;}
+.schedule-move-bar button{border:none;border-radius:999px;padding:6px 12px;background:#ef4444;color:#fff;font-weight:700;cursor:pointer;font-size:12px;}
 
 @media (max-width:1100px){
   .schedule-board{grid-template-columns:repeat(3,1fr);}
@@ -493,6 +499,14 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 .schedule-card{cursor:grab;}
 .schedule-card:active{cursor:grabbing;}
 .section-cards.drag-target-active{background:rgba(37,99,235,.08);outline:2px dashed #93c5fd;border-radius:10px;}
+.detail-category-row{margin:12px 0 14px;padding:12px 14px;background:#f8fafc;border:1.5px solid var(--border);border-radius:10px;}
+.schedule-card{cursor:pointer;}
+.schedule-card.picked{outline:3px solid #2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.2);}
+.section-cards.move-target{cursor:pointer;}
+.section-cards.move-target:hover{background:rgba(37,99,235,.05);outline:2px dashed #93c5fd;border-radius:10px;}
+.schedule-move-bar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 16px;border-radius:999px;font-size:13px;font-weight:700;z-index:650;display:none;gap:10px;align-items:center;box-shadow:0 8px 22px rgba(15,23,42,.3);}
+.schedule-move-bar.show{display:flex;}
+.schedule-move-bar button{border:none;border-radius:999px;padding:6px 12px;background:#ef4444;color:#fff;font-weight:700;cursor:pointer;font-size:12px;}
 .detail-category-row{margin:12px 0 14px;padding:12px 14px;background:#f8fafc;border:1.5px solid var(--border);border-radius:10px;}
 
 </style>
@@ -4721,5 +4735,204 @@ window.submitSuddenWork=function(){
   window.addEventListener('load', scan);
   scan();
 })();
+<script>
+function loadCategoryStore(){ try{ return JSON.parse(localStorage.getItem('taskCategoryOverrideStore'))||{}; }catch(e){ return {}; } }
+function saveCategoryStore(data){ localStorage.setItem('taskCategoryOverrideStore', JSON.stringify(data)); }
+let taskCategoryOverride = loadCategoryStore();
+const CATEGORY_LABELS = {daily:'매일 작업', weekly:'주간 작업', monthly:'월간 작업', sudden:'불시 작업', reply:'연락 회신 작업'};
+
+let pickedTaskItem = null;
+function createMoveBar(){
+  let bar = document.getElementById('schedule-move-bar');
+  if(bar) return bar;
+  bar = document.createElement('div');
+  bar.id = 'schedule-move-bar';
+  bar.className = 'schedule-move-bar';
+  const label = document.createElement('span');
+  label.id = 'schedule-move-bar-label';
+  const cancel = document.createElement('button');
+  cancel.textContent = '취소';
+  cancel.addEventListener('click', clearPickedTaskItem);
+  bar.appendChild(label); bar.appendChild(cancel);
+  document.body.appendChild(bar);
+  return bar;
+}
+function clearPickedTaskItem(){
+  pickedTaskItem = null;
+  document.querySelectorAll('.schedule-card.picked').forEach(el=>el.classList.remove('picked'));
+  document.querySelectorAll('.section-cards.move-target').forEach(el=>el.classList.remove('move-target'));
+  const bar = document.getElementById('schedule-move-bar');
+  if(bar) bar.classList.remove('show');
+}
+function pickTaskItem(item, el){
+  if(pickedTaskItem && pickedTaskItem.itemKey===item.itemKey){ clearPickedTaskItem(); return; }
+  clearPickedTaskItem();
+  pickedTaskItem = item;
+  el.classList.add('picked');
+  document.querySelectorAll('.schedule-section').forEach(sec=>{
+    const cardsEl = sec.querySelector('.section-cards');
+    if(cardsEl) cardsEl.classList.add('move-target');
+  });
+  const bar = createMoveBar();
+  document.getElementById('schedule-move-bar-label').textContent = '"'+item.s.name+'" 선택됨 · 옮길 칸을 클릭하세요';
+  bar.classList.add('show');
+}
+async function moveTaskItemToCategory(item, category){
+  taskCategoryOverride[item.itemKey] = category;
+  saveCategoryStore(taskCategoryOverride);
+  clearPickedTaskItem();
+  window.renderScheduleBoard();
+  if(typeof currentDetailSiteName!=='undefined' && currentDetailSiteName===item.s.name) renderDetailCategoryBlock(item.s);
+  await syncTaskCategoryToNotion(item.s.name, category);
+}
+async function syncTaskCategoryToNotion(siteName, category){
+  try{
+    const pageId = (typeof anyPageIdForSite==='function') ? (anyPageIdForSite('visit', siteName) || anyPageIdForSite('contact', siteName)) : null;
+    if(!pageId){ showSyncBanner(siteName+' → '+CATEGORY_LABELS[category]+' (로컬에만 저장됨)', 'f59e0b'); return; }
+    await saveSiteFieldsRealtime(siteName, {taskCategory: category}, {visit: pageId, contact: pageId});
+    showSyncBanner(siteName+' → '+CATEGORY_LABELS[category]+' (Notion 저장됨)', '16a34a');
+  }catch(e){
+    console.error('syncTaskCategoryToNotion', e);
+    showSyncBanner(siteName+' → '+CATEGORY_LABELS[category]+' (로컬만 저장, Notion 실패)', 'ef4444');
+  }
+}
+
+function buildScheduleCard(item){
+  const div = document.createElement('div');
+  div.className = 'schedule-card' + (item.manual ? ' sudden' : '');
+  const title = document.createElement('div'); title.className='card-title'; title.textContent = item.s.name;
+  const sub = document.createElement('div'); sub.className='card-sub'; sub.textContent = item.manual ? (item.raw.priority||'') : item.s.company;
+  const meta = document.createElement('div'); meta.className='card-meta'; meta.textContent = item.manual ? item.k : (item.k+' · '+item.d);
+  div.appendChild(title); div.appendChild(sub); div.appendChild(meta);
+  if(!item.manual){
+    div.addEventListener('click', (e)=>{ e.stopPropagation(); pickTaskItem(item, div); });
+    div.addEventListener('dblclick', (e)=>{ e.stopPropagation(); clearPickedTaskItem(); openDetailByName(item.s.name); });
+  } else {
+    div.addEventListener('click', ()=>{ if(item.s.name) openDetailByName(item.s.name); });
+  }
+  return div;
+}
+
+const originalRenderScheduleBoard = window.renderScheduleBoard;
+window.renderScheduleBoard = function(){
+  try{
+    const buckets = {daily:[], weekly:[], monthly:[], sudden:[], reply:[]};
+    sites.forEach(s=>{
+      (visitStore[s.name]||[]).forEach(d=>{
+        const ds = String(d).slice(0,10);
+        const key = s.name+'|visit|'+ds;
+        const bucket = taskCategoryOverride[key] || 'sudden';
+        if(buckets[bucket]) buckets[bucket].push({s,d:ds,k:'방문',itemKey:key});
+      });
+      (contactStore[s.name]||[]).forEach(d=>{
+        const ds = String(d).slice(0,10);
+        const key = s.name+'|contact|'+ds;
+        const bucket = taskCategoryOverride[key] || 'sudden';
+        if(buckets[bucket]) buckets[bucket].push({s,d:ds,k:'회신',itemKey:key});
+      });
+    });
+    (window.suddenWorkStore||[]).forEach(w=>{
+      buckets.sudden.push({s:{name:w.siteName, company:''}, k:w.desc||'불시작업', manual:true, raw:w});
+    });
+
+    const sectionMap = [
+      ['daily','cards-daily','count-daily','오늘로 지정된 작업이 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.'],
+      ['weekly','cards-weekly','count-weekly','이번주로 지정된 작업이 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.'],
+      ['monthly','cards-monthly','count-monthly','이번달로 지정된 작업이 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.'],
+      ['sudden','cards-sudden','count-sudden','등록된 불시 작업이 없습니다.'],
+      ['reply','cards-reply','count-reply','연락 회신으로 지정된 항목이 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.']
+    ];
+    sectionMap.forEach(([key,elId,countId,emptyMsg])=>{
+      const list = buckets[key];
+      const el = document.getElementById(elId);
+      const countEl = document.getElementById(countId);
+      if(countEl) countEl.textContent = list.length;
+      if(el){
+        el.innerHTML = '';
+        if(!list.length){
+          const empty = document.createElement('div'); empty.className='empty'; empty.textContent = emptyMsg;
+          el.appendChild(empty);
+        } else {
+          list.forEach(item => el.appendChild(buildScheduleCard(item)));
+        }
+      }
+    });
+
+    document.querySelectorAll('.schedule-section').forEach(section=>{
+      const category = section.dataset.section;
+      const cardsEl = section.querySelector('.section-cards');
+      if(!cardsEl || !category) return;
+      cardsEl.onclick = (e)=>{
+        if(e.target !== cardsEl) return;
+        if(!pickedTaskItem) return;
+        moveTaskItemToCategory(pickedTaskItem, category);
+      };
+    });
+  }catch(e){ console.error('renderScheduleBoard', e); if(typeof originalRenderScheduleBoard==='function') originalRenderScheduleBoard(); }
+};
+
+function renderDetailCategoryBlock(site){
+  const shell = document.querySelector('#detail-modal .detail-scroll-shell');
+  if(!shell) return;
+  let wrap = document.getElementById('detail-category-row');
+  if(!wrap){
+    wrap = document.createElement('div');
+    wrap.id = 'detail-category-row';
+    wrap.className = 'detail-category-row';
+    const noteWrap = document.getElementById('detail-note-wrap');
+    (noteWrap||shell).insertAdjacentElement('afterend', wrap);
+  }
+  wrap.innerHTML = '';
+  const title = document.createElement('div');
+  title.style.cssText = 'font-size:13px;font-weight:800;color:#334155;margin-bottom:8px;';
+  title.textContent = '📋 작업 분류 (여기서 바꾸면 Notion에도 저장됩니다)';
+  wrap.appendChild(title);
+
+  const items = [];
+  (visitStore[site.name]||[]).forEach(d=>{ const ds=String(d).slice(0,10); items.push({label:'방문 · '+ds, key:site.name+'|visit|'+ds}); });
+  (contactStore[site.name]||[]).forEach(d=>{ const ds=String(d).slice(0,10); items.push({label:'회신 · '+ds, key:site.name+'|contact|'+ds}); });
+
+  if(!items.length){
+    const empty = document.createElement('div');
+    empty.style.cssText = 'font-size:12px;color:#94a3b8;';
+    empty.textContent = '등록된 방문/연락 일정이 없습니다.';
+    wrap.appendChild(empty);
+    return;
+  }
+  items.forEach(it=>{
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px dashed #e2e8f0;';
+    const span = document.createElement('span');
+    span.style.cssText = 'font-size:13px;color:#334155;font-weight:600;';
+    span.textContent = it.label;
+    const select = document.createElement('select');
+    select.className = 'detail-edit-select';
+    select.style.cssText = 'width:auto;padding:6px 8px;font-size:12.5px;';
+    Object.entries(CATEGORY_LABELS).forEach(([val,label])=>{
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = label;
+      select.appendChild(opt);
+    });
+    select.value = taskCategoryOverride[it.key] || 'sudden';
+    select.addEventListener('change', ()=>{
+      taskCategoryOverride[it.key] = select.value;
+      saveCategoryStore(taskCategoryOverride);
+      window.renderScheduleBoard();
+      syncTaskCategoryToNotion(site.name, select.value);
+    });
+    row.appendChild(span); row.appendChild(select);
+    wrap.appendChild(row);
+  });
+}
+
+const originalOpenDetailByNameForCategory = window.openDetailByName;
+window.openDetailByName = function(name){
+  const result = originalOpenDetailByNameForCategory.apply(this, arguments);
+  try{
+    const site = getSiteByName(name);
+    if(site) renderDetailCategoryBlock(site);
+  }catch(e){ console.error(e); }
+  return result;
+};
 </script></body>
 </html>
