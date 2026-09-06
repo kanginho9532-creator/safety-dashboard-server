@@ -4501,246 +4501,6 @@ function saveCategoryStore(data){ localStorage.setItem('taskCategoryOverrideStor
 let taskCategoryOverride = loadCategoryStore();
 const CATEGORY_LABELS = {daily:'매일 작업', weekly:'주간 작업', monthly:'월간 작업', sudden:'불시 작업', reply:'연락 회신 작업'};
 
-function buildScheduleCard(item){
-  const div = document.createElement('div');
-  div.className = 'schedule-card' + (item.manual ? ' sudden' : '');
-  div.draggable = true;
-  const title = document.createElement('div'); title.className='card-title'; title.textContent = item.s.name;
-  const sub = document.createElement('div'); sub.className='card-sub'; sub.textContent = item.manual ? (item.raw.priority||'') : item.s.company;
-  const meta = document.createElement('div'); meta.className='card-meta'; meta.textContent = item.manual ? item.k : (item.k+' · '+item.d);
-  div.appendChild(title); div.appendChild(sub); div.appendChild(meta);
-  div.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/plain', item.itemKey||''); e.dataTransfer.effectAllowed='move'; });
-  div.addEventListener('click', ()=>{ if(item.s && item.s.name) openDetailByName(item.s.name); });
-  return div;
-}
-
-const originalRenderScheduleBoard = window.renderScheduleBoard;
-window.renderScheduleBoard = function(){
-  try{
-    const buckets = {daily:[], weekly:[], monthly:[], sudden:[], reply:[]};
-    sites.forEach(s=>{
-      (visitStore[s.name]||[]).forEach(d=>{
-        const ds = String(d).slice(0,10);
-        const key = s.name+'|visit|'+ds;
-        const bucket = taskCategoryOverride[key] || 'sudden';
-        if(buckets[bucket]) buckets[bucket].push({s,d:ds,k:'방문',itemKey:key});
-      });
-      (contactStore[s.name]||[]).forEach(d=>{
-        const ds = String(d).slice(0,10);
-        const key = s.name+'|contact|'+ds;
-        const bucket = taskCategoryOverride[key] || 'sudden';
-        if(buckets[bucket]) buckets[bucket].push({s,d:ds,k:'회신',itemKey:key});
-      });
-    });
-    (window.suddenWorkStore||[]).forEach(w=>{
-      buckets.sudden.push({s:{name:w.siteName, company:''}, k:w.desc||'불시작업', manual:true, raw:w});
-    });
-
-    const sectionMap = [
-      ['daily','cards-daily','count-daily','오늘로 지정된 작업이 없습니다. 카드를 이 칸으로 끌어다 놓으세요.'],
-      ['weekly','cards-weekly','count-weekly','이번주로 지정된 작업이 없습니다. 카드를 이 칸으로 끌어다 놓으세요.'],
-      ['monthly','cards-monthly','count-monthly','이번달로 지정된 작업이 없습니다. 카드를 이 칸으로 끌어다 놓으세요.'],
-      ['sudden','cards-sudden','count-sudden','등록된 불시 작업이 없습니다.'],
-      ['reply','cards-reply','count-reply','연락 회신으로 지정된 항목이 없습니다. 카드를 이 칸으로 끌어다 놓으세요.']
-    ];
-    sectionMap.forEach(([key,elId,countId,emptyMsg])=>{
-      const list = buckets[key];
-      const el = document.getElementById(elId);
-      const countEl = document.getElementById(countId);
-      if(countEl) countEl.textContent = list.length;
-      if(el){
-        el.innerHTML = '';
-        if(!list.length){
-          const empty = document.createElement('div'); empty.className='empty'; empty.textContent = emptyMsg;
-          el.appendChild(empty);
-        } else {
-          list.forEach(item => el.appendChild(buildScheduleCard(item)));
-        }
-      }
-    });
-
-    document.querySelectorAll('.schedule-section').forEach(section=>{
-      const category = section.dataset.section;
-      const cardsEl = section.querySelector('.section-cards');
-      if(!cardsEl || !category) return;
-      cardsEl.ondragover = e=>{ e.preventDefault(); cardsEl.classList.add('drag-target-active'); };
-      cardsEl.ondragleave = ()=> cardsEl.classList.remove('drag-target-active');
-      cardsEl.ondrop = e=>{
-        e.preventDefault();
-        cardsEl.classList.remove('drag-target-active');
-        const itemKey = e.dataTransfer.getData('text/plain');
-        if(!itemKey) return;
-        taskCategoryOverride[itemKey] = category;
-        saveCategoryStore(taskCategoryOverride);
-        window.renderScheduleBoard();
-      };
-    });
-  }catch(e){ console.error('renderScheduleBoard', e); if(typeof originalRenderScheduleBoard==='function') originalRenderScheduleBoard(); }
-};
-
-function renderDetailCategoryBlock(site){
-  const shell = document.querySelector('#detail-modal .detail-scroll-shell');
-  if(!shell) return;
-  let wrap = document.getElementById('detail-category-row');
-  if(!wrap){
-    wrap = document.createElement('div');
-    wrap.id = 'detail-category-row';
-    wrap.className = 'detail-category-row';
-    const noteWrap = document.getElementById('detail-note-wrap');
-    (noteWrap||shell).insertAdjacentElement('afterend', wrap);
-  }
-  wrap.innerHTML = '';
-  const title = document.createElement('div');
-  title.style.cssText = 'font-size:13px;font-weight:800;color:#334155;margin-bottom:8px;';
-  title.textContent = '📋 작업 분류 (작업 관리 화면과 실시간 연동)';
-  wrap.appendChild(title);
-
-  const items = [];
-  (visitStore[site.name]||[]).forEach(d=>{ const ds=String(d).slice(0,10); items.push({label:'방문 · '+ds, key:site.name+'|visit|'+ds}); });
-  (contactStore[site.name]||[]).forEach(d=>{ const ds=String(d).slice(0,10); items.push({label:'회신 · '+ds, key:site.name+'|contact|'+ds}); });
-
-  if(!items.length){
-    const empty = document.createElement('div');
-    empty.style.cssText = 'font-size:12px;color:#94a3b8;';
-    empty.textContent = '등록된 방문/연락 일정이 없습니다.';
-    wrap.appendChild(empty);
-    return;
-  }
-  items.forEach(it=>{
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px dashed #e2e8f0;';
-    const span = document.createElement('span');
-    span.style.cssText = 'font-size:13px;color:#334155;font-weight:600;';
-    span.textContent = it.label;
-    const select = document.createElement('select');
-    select.className = 'detail-edit-select';
-    select.style.cssText = 'width:auto;padding:6px 8px;font-size:12.5px;';
-    Object.entries(CATEGORY_LABELS).forEach(([val,label])=>{
-      const opt = document.createElement('option');
-      opt.value = val; opt.textContent = label;
-      select.appendChild(opt);
-    });
-    select.value = taskCategoryOverride[it.key] || 'sudden';
-    select.addEventListener('change', ()=>{
-      taskCategoryOverride[it.key] = select.value;
-      saveCategoryStore(taskCategoryOverride);
-      window.renderScheduleBoard();
-    });
-    row.appendChild(span); row.appendChild(select);
-    wrap.appendChild(row);
-  });
-}
-
-const originalOpenDetailByNameForCategory = window.openDetailByName;
-window.openDetailByName = function(name){
-  const result = originalOpenDetailByNameForCategory.apply(this, arguments);
-  try{
-    const site = getSiteByName(name);
-    if(site) renderDetailCategoryBlock(site);
-  }catch(e){ console.error(e); }
-  return result;
-};
-
-</script>
-<script>
-window.toggleCalendarCompanyView = function(gridId, btn){
-  try{
-    window.__calCompanyExpanded = window.__calCompanyExpanded || {};
-    window.__calCompanyExpanded[gridId] = !window.__calCompanyExpanded[gridId];
-    var on = window.__calCompanyExpanded[gridId];
-    if(btn){ btn.textContent = on ? '업체 묶음 ON' : '업체 묶음 OFF (공사명만)'; btn.classList.toggle('off', !on); }
-    if(typeof refreshCalendars === 'function'){ refreshCalendars(); }
-    else if(typeof renderCalendarWorkbench === 'function'){ renderCalendarWorkbench(); }
-    if(typeof renderSideCards === 'function'){
-      var activeBtn = document.querySelector('.tab-btn.active');
-      var tab = (activeBtn && activeBtn.textContent || '').includes('연락') ? 'contact' : 'visit';
-      renderSideCards(tab==='contact' ? 'contact-unvisited-list' : 'unvisited-list', tab==='contact' ? 'contact-never-list' : 'never-list', tab);
-    }
-  }catch(e){ console.warn('toggle err:', e); }
-};
-
-window.__suddenWorkStore=window.__suddenWorkStore||[];
-window.renderScheduleBoard=function(){
-  try{
-    const today=new Date();
-    const todayStr=today.toISOString().slice(0,10);
-    const dow=today.getDay();
-    const monday=new Date(today); monday.setDate(today.getDate()-((dow+6)%7));
-    const sunday=new Date(monday); sunday.setDate(monday.getDate()+6);
-    const monthStart=new Date(today.getFullYear(),today.getMonth(),1);
-    const monthEnd=new Date(today.getFullYear(),today.getMonth()+1,0);
-    const replyStart=new Date(today); replyStart.setDate(today.getDate()-14);
-    const cardOf=(s,d,k)=>'<div class="schedule-card" onclick="openDetailByName(\''+s.name.replace(/'/g,"\\'")+'\')"><div class="card-title">'+s.name+'</div><div class="card-sub">'+s.company+'</div><div class="card-meta">'+k+' · '+d+'</div></div>';
-    const daily=[],weekly=[],monthly=[],reply=[];
-    (sites||[]).forEach(s=>{
-      (visitStore[s.name]||[]).forEach(d=>{
-        const ds=(d+'').slice(0,10);
-        if(ds===todayStr) daily.push({s,d,k:'방문'});
-        const dt=new Date(d);
-        if(dt>=monday&&dt<=sunday) weekly.push({s,d,k:'방문'});
-        if(dt>=monthStart&&dt<=monthEnd) monthly.push({s,d,k:'방문'});
-      });
-      (contactStore[s.name]||[]).forEach(d=>{
-        const ds=(d+'').slice(0,10);
-        if(ds===todayStr) daily.push({s,d,k:'연락'});
-        const dt=new Date(d);
-        if(dt>=replyStart&&dt<=today) reply.push({s,d,k:'회신'});
-      });
-    });
-    document.getElementById('cards-daily').innerHTML=daily.length?daily.map(x=>cardOf(x.s,x.d,x.k)).join(''):'<div class="empty">오늘 예정된 작업이 없습니다.</div>';
-    document.getElementById('count-daily').textContent=daily.length;
-    document.getElementById('cards-weekly').innerHTML=weekly.length?weekly.map(x=>cardOf(x.s,x.d,x.k)).join(''):'<div class="empty">이번주 예정된 작업이 없습니다.</div>';
-    document.getElementById('count-weekly').textContent=weekly.length;
-    document.getElementById('cards-monthly').innerHTML=monthly.length?monthly.map(x=>cardOf(x.s,x.d,x.k)).join(''):'<div class="empty">이번달 예정된 작업이 없습니다.</div>';
-    document.getElementById('count-monthly').textContent=monthly.length;
-    document.getElementById('cards-sudden').innerHTML=(window.__suddenWorkStore||[]).length?window.__suddenWorkStore.map(w=>'<div class="schedule-card sudden"><div class="card-title">⚡ '+w.siteName+'</div><div class="card-sub">'+w.priority+'</div><div class="card-meta">'+w.desc+'</div></div>').join(''):'<div class="empty">등록된 불시 작업이 없습니다.</div>';
-    document.getElementById('count-sudden').textContent=(window.__suddenWorkStore||[]).length;
-    document.getElementById('cards-reply').innerHTML=reply.length?reply.map(x=>cardOf(x.s,x.d,x.k)).join(''):'<div class="empty">최근 14일 내 연락 회신이 없습니다.</div>';
-    document.getElementById('count-reply').textContent=reply.length;
-  }catch(e){console.error('renderScheduleBoard',e);}
-};
-window.openSuddenWorkModal=function(){
-  const sel=document.getElementById('sudden-site');
-  sel.innerHTML=(sites||[]).map(s=>'<option value="'+s.name+'">'+s.name+' ('+s.company+')</option>').join('');
-  document.getElementById('sudden-work-modal').classList.add('active');
-};
-window.closeSuddenWorkModal=function(){document.getElementById('sudden-work-modal').classList.remove('active');};
-window.submitSuddenWork=function(){
-  const sn=document.getElementById('sudden-site').value;
-  const desc=document.getElementById('sudden-desc').value.trim();
-  const pr=document.getElementById('sudden-priority').value;
-  if(!sn||!desc){alert('현장과 내용을 입력하세요');return;}
-  window.__suddenWorkStore.push({siteName:sn,desc:desc,priority:pr,ts:Date.now()});
-  closeSuddenWorkModal();
-  renderScheduleBoard();
-  if(typeof fetch==='function'){fetch('/api/ai-command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'sudden-work',siteName:sn,desc:desc,priority:pr})}).catch(()=>{});}
-};
-(function(){
-  const SCROLL_SELECTORS = ['.dash-scroll','.side-list','.side-section','.table-wrap','.section-cards','.cal-cell','.modal-box','.detail-scroll-shell','.completion-list','.ai-week-grid','.calendar-summary-list','.date-rail'];
-  const mem = new WeakMap();
-  function track(el){
-    if(!el || mem.has(el)) return;
-    mem.set(el, {top:el.scrollTop, left:el.scrollLeft});
-    el.addEventListener('scroll', ()=>mem.set(el, {top:el.scrollTop, left:el.scrollLeft}), {passive:true});
-  }
-  function scan(){ SCROLL_SELECTORS.forEach(sel=>document.querySelectorAll(sel).forEach(track)); }
-  function restore(){
-    SCROLL_SELECTORS.forEach(sel=>document.querySelectorAll(sel).forEach(el=>{
-      const pos = mem.get(el);
-      if(pos){ if(el.scrollTop!==pos.top) el.scrollTop=pos.top; if(el.scrollLeft!==pos.left) el.scrollLeft=pos.left; }
-      else track(el);
-    }));
-  }
-  new MutationObserver(()=>requestAnimationFrame(restore)).observe(document.body, {childList:true, subtree:true});
-  window.addEventListener('load', scan);
-  scan();
-})();
-<script>
-function loadCategoryStore(){ try{ return JSON.parse(localStorage.getItem('taskCategoryOverrideStore'))||{}; }catch(e){ return {}; } }
-function saveCategoryStore(data){ localStorage.setItem('taskCategoryOverrideStore', JSON.stringify(data)); }
-let taskCategoryOverride = loadCategoryStore();
-const CATEGORY_LABELS = {daily:'매일 작업', weekly:'주간 작업', monthly:'월간 작업', sudden:'불시 작업', reply:'연락 회신 작업'};
-
 let pickedTaskItem = null;
 function createMoveBar(){
   let bar = document.getElementById('schedule-move-bar');
@@ -4802,7 +4562,8 @@ function buildScheduleCard(item){
   div.className = 'schedule-card' + (item.manual ? ' sudden' : '');
   const title = document.createElement('div'); title.className='card-title'; title.textContent = item.s.name;
   const sub = document.createElement('div'); sub.className='card-sub'; sub.textContent = item.manual ? (item.raw.priority||'') : item.s.company;
-  const meta = document.createElement('div'); meta.className='card-meta'; meta.textContent = item.manual ? item.k : (item.k+' · '+item.d);
+  const meta = document.createElement('div'); meta.className='card-meta';
+  meta.textContent = item.manual ? (item.raw.desc||'불시작업') : ('방문 '+item.visitCount+'회 · 회신 '+item.contactCount+'회');
   div.appendChild(title); div.appendChild(sub); div.appendChild(meta);
   if(!item.manual){
     div.addEventListener('click', (e)=>{ e.stopPropagation(); pickTaskItem(item, div); });
@@ -4817,30 +4578,25 @@ const originalRenderScheduleBoard = window.renderScheduleBoard;
 window.renderScheduleBoard = function(){
   try{
     const buckets = {daily:[], weekly:[], monthly:[], sudden:[], reply:[]};
+    const seen = new Set();
     sites.forEach(s=>{
-      (visitStore[s.name]||[]).forEach(d=>{
-        const ds = String(d).slice(0,10);
-        const key = s.name+'|visit|'+ds;
-        const bucket = taskCategoryOverride[key] || 'sudden';
-        if(buckets[bucket]) buckets[bucket].push({s,d:ds,k:'방문',itemKey:key});
-      });
-      (contactStore[s.name]||[]).forEach(d=>{
-        const ds = String(d).slice(0,10);
-        const key = s.name+'|contact|'+ds;
-        const bucket = taskCategoryOverride[key] || 'sudden';
-        if(buckets[bucket]) buckets[bucket].push({s,d:ds,k:'회신',itemKey:key});
-      });
+      if(seen.has(s.name)) return;
+      seen.add(s.name);
+      const bucket = taskCategoryOverride[s.name] || 'sudden';
+      const visitCount = (visitStore[s.name]||[]).length;
+      const contactCount = (contactStore[s.name]||[]).length;
+      if(buckets[bucket]) buckets[bucket].push({s, itemKey:s.name, visitCount, contactCount});
     });
     (window.suddenWorkStore||[]).forEach(w=>{
-      buckets.sudden.push({s:{name:w.siteName, company:''}, k:w.desc||'불시작업', manual:true, raw:w});
+      buckets.sudden.push({s:{name:w.siteName, company:''}, manual:true, raw:w, itemKey:'manual|'+w.siteName+'|'+w.ts});
     });
 
     const sectionMap = [
-      ['daily','cards-daily','count-daily','오늘로 지정된 작업이 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.'],
-      ['weekly','cards-weekly','count-weekly','이번주로 지정된 작업이 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.'],
-      ['monthly','cards-monthly','count-monthly','이번달로 지정된 작업이 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.'],
+      ['daily','cards-daily','count-daily','매일 작업으로 지정된 공사가 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.'],
+      ['weekly','cards-weekly','count-weekly','주간 작업으로 지정된 공사가 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.'],
+      ['monthly','cards-monthly','count-monthly','월간 작업으로 지정된 공사가 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.'],
       ['sudden','cards-sudden','count-sudden','등록된 불시 작업이 없습니다.'],
-      ['reply','cards-reply','count-reply','연락 회신으로 지정된 항목이 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.']
+      ['reply','cards-reply','count-reply','연락 회신 작업으로 지정된 공사가 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.']
     ];
     sectionMap.forEach(([key,elId,countId,emptyMsg])=>{
       const list = buckets[key];
@@ -4883,46 +4639,25 @@ function renderDetailCategoryBlock(site){
     (noteWrap||shell).insertAdjacentElement('afterend', wrap);
   }
   wrap.innerHTML = '';
-  const title = document.createElement('div');
-  title.style.cssText = 'font-size:13px;font-weight:800;color:#334155;margin-bottom:8px;';
-  title.textContent = '📋 작업 분류 (여기서 바꾸면 Notion에도 저장됩니다)';
-  wrap.appendChild(title);
-
-  const items = [];
-  (visitStore[site.name]||[]).forEach(d=>{ const ds=String(d).slice(0,10); items.push({label:'방문 · '+ds, key:site.name+'|visit|'+ds}); });
-  (contactStore[site.name]||[]).forEach(d=>{ const ds=String(d).slice(0,10); items.push({label:'회신 · '+ds, key:site.name+'|contact|'+ds}); });
-
-  if(!items.length){
-    const empty = document.createElement('div');
-    empty.style.cssText = 'font-size:12px;color:#94a3b8;';
-    empty.textContent = '등록된 방문/연락 일정이 없습니다.';
-    wrap.appendChild(empty);
-    return;
-  }
-  items.forEach(it=>{
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px dashed #e2e8f0;';
-    const span = document.createElement('span');
-    span.style.cssText = 'font-size:13px;color:#334155;font-weight:600;';
-    span.textContent = it.label;
-    const select = document.createElement('select');
-    select.className = 'detail-edit-select';
-    select.style.cssText = 'width:auto;padding:6px 8px;font-size:12.5px;';
-    Object.entries(CATEGORY_LABELS).forEach(([val,label])=>{
-      const opt = document.createElement('option');
-      opt.value = val; opt.textContent = label;
-      select.appendChild(opt);
-    });
-    select.value = taskCategoryOverride[it.key] || 'sudden';
-    select.addEventListener('change', ()=>{
-      taskCategoryOverride[it.key] = select.value;
-      saveCategoryStore(taskCategoryOverride);
-      window.renderScheduleBoard();
-      syncTaskCategoryToNotion(site.name, select.value);
-    });
-    row.appendChild(span); row.appendChild(select);
-    wrap.appendChild(row);
+  const label = document.createElement('label');
+  label.textContent = '📋 작업 분류';
+  label.style.cssText = 'font-size:13px;font-weight:800;color:#334155;margin-right:10px;';
+  const select = document.createElement('select');
+  select.className = 'detail-edit-select';
+  select.style.cssText = 'width:auto;padding:8px 10px;font-size:13px;';
+  Object.entries(CATEGORY_LABELS).forEach(([val,lbl])=>{
+    const opt = document.createElement('option');
+    opt.value = val; opt.textContent = lbl;
+    select.appendChild(opt);
   });
+  select.value = taskCategoryOverride[site.name] || 'sudden';
+  select.addEventListener('change', ()=>{
+    taskCategoryOverride[site.name] = select.value;
+    saveCategoryStore(taskCategoryOverride);
+    window.renderScheduleBoard();
+    syncTaskCategoryToNotion(site.name, select.value);
+  });
+  wrap.appendChild(label); wrap.appendChild(select);
 }
 
 const originalOpenDetailByNameForCategory = window.openDetailByName;
@@ -4934,6 +4669,7 @@ window.openDetailByName = function(name){
   }catch(e){ console.error(e); }
   return result;
 };
+
 if(document.getElementById('cards-daily')) window.renderScheduleBoard();
 </script></body>
 </html>
