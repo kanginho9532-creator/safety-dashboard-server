@@ -514,6 +514,26 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 .schedule-search{width:100%;box-sizing:border-box;padding:8px 10px;margin-bottom:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:12.5px;}
 .section-cards::-webkit-scrollbar{width:6px;}
 .section-cards::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px;}
+.section-cards > .schedule-card{
+  white-space:normal !important;
+  overflow:visible !important;
+  text-overflow:unset !important;
+  max-width:none !important;
+  height:auto !important;
+  display:block !important;
+  line-height:1.5 !important;
+  position:relative !important;
+}
+.section-cards > .schedule-card .card-title,
+.section-cards > .schedule-card .card-sub,
+.section-cards > .schedule-card .card-meta{
+  white-space:normal !important;
+  overflow:visible !important;
+  text-overflow:unset !important;
+  position:static !important;
+  display:block !important;
+  width:100% !important;
+}
 
 </style>
 </head>
@@ -4702,5 +4722,6 @@ window.openDetailByName = function(name){
 };
 
 if(document.getElementById('cards-daily')) window.renderScheduleBoard();
+document.querySelectorAll('#schedule .panel').forEach(p=>{ if(p.querySelector('#stat-table')) p.style.display='none'; });
 </script></body>
 </html>
