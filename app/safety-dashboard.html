@@ -476,6 +476,19 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 .schedule-section[data-section="reply"]{background:#fff7ed;}
 .schedule-section[data-section="reply"] .badge{background:#f59e0b;}
 .schedule-section[data-section="reply"] .section-cards > *{background:#ffedd5;color:#c2410c;border-color:#fed7aa;}
+.schedule-board{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;align-items:start;}
+.schedule-board__header{grid-column:1/-1;}
+.schedule-section{margin-bottom:0;height:100%;display:flex;flex-direction:column;}
+.section-cards{display:flex;flex-direction:column;gap:8px;flex:1;}
+.section-cards > *{max-width:100%;white-space:normal;}
+
+@media (max-width:1100px){
+  .schedule-board{grid-template-columns:repeat(3,1fr);}
+}
+@media (max-width:800px){
+  .schedule-board{grid-template-columns:1fr;}
+  .schedule-board__header{grid-column:1;}
+}
 .section-cards .empty{background:transparent!important;border:1px dashed #cbd5e1!important;color:#94a3b8!important;cursor:default;}
 
 </style>
