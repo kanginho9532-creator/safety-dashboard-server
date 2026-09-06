@@ -4574,8 +4574,14 @@ async function moveTaskItemToCategory(item, category){
 async function syncTaskCategoryToNotion(siteName, category){
   try{
     const pageId = (typeof anyPageIdForSite==='function') ? (anyPageIdForSite('visit', siteName) || anyPageIdForSite('contact', siteName)) : null;
-    if(!pageId){ showSyncBanner(siteName+' → '+CATEGORY_LABELS[category]+' (로컬에만 저장됨)', 'f59e0b'); return; }
-    await saveSiteFieldsRealtime(siteName, {taskCategory: category}, {visit: pageId, contact: pageId});
+    if(!pageId){ showSyncBanner(siteName+' → '+CATEGORY_LABELS[category]+' (Notion 페이지ID 없음, 로컬에만 저장됨)', 'f59e0b'); return; }
+    const resp = await fetch(API_BASE + '/api/update-select', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ pageId, propertyName: '작업관리', value: CATEGORY_LABELS[category] })
+    });
+    const data = await resp.json();
+    if(!data.ok) throw new Error(data.error || 'unknown error');
     showSyncBanner(siteName+' → '+CATEGORY_LABELS[category]+' (Notion 저장됨)', '16a34a');
   }catch(e){
     console.error('syncTaskCategoryToNotion', e);
