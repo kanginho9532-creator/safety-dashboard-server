@@ -3128,7 +3128,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(!site) return;
     currentDetailSiteName = site.name;
     const titleEl = document.getElementById('detail-title');
-    titleEl.innerHTML = '<div class="detail-title-edit"><textarea id="detail-title-input" class="detail-edit-input detail-title-textarea" rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';">공사명내용</textarea>
+    titleEl.innerHTML = '<div class="detail-title-edit"><textarea id="detail-title-input" class="detail-edit-input detail-title-textarea" rows="1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';">' + escapeHtml(site.name) + '</textarea><span class="detail-live-badge">🟢 실시간 저장 켜짐</span></div>';
     renderDetailEditableField('detail-manager-company', 'detail-company-input', 'text', site.company || '', '<button type="button" class="detail-inline-link-btn" onclick="openCompanyFromDetail()">회사 카드 열기</button>');
     renderDetailEditableField('detail-manager-site', 'detail-site-input-top', 'text', site.site || site.region || '');
     renderDetailEditableField('detail-manager-name', 'detail-manager-name-input', 'text', site.managerName || '');
@@ -4153,7 +4153,7 @@ document.addEventListener('DOMContentLoaded', () => {
     currentDetailSiteName = site.name;
     ensureDetailAuxBlocks();
     const titleEl = document.getElementById('detail-title');
-    titleEl.innerHTML = '<div class="detail-title-edit">'<textarea id="detail-title-input" class="detail-edit-input detail-title-textarea" rows="1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';">'+escapeHtml(site.name)+'</textarea>'
+    titleEl.innerHTML = '<div class="detail-title-edit"><textarea id="detail-title-input" class="detail-edit-input detail-title-textarea" rows="1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';">' + escapeHtml(site.name) + '</textarea><span class="detail-live-badge">🟢 실시간 저장 켜짐</span></div>';
     renderDetailEditableField('detail-manager-company', 'detail-company-input', 'text', site.company || '', '<button type="button" class="detail-inline-link-btn" onclick="openCompanyFromDetail()">회사 카드 열기</button>');
     renderDetailEditableField('detail-manager-site', 'detail-site-input-top', 'text', site.site || site.region || '');
     renderDetailEditableField('detail-manager-name', 'detail-manager-name-input', 'text', site.managerName || '');
