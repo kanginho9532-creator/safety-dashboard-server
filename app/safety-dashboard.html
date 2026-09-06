@@ -4751,7 +4751,15 @@ function restoreCalendarScroll(){
       }catch(e){}
     });
   };
-  requestAnimationFrame(()=>{ apply(); setTimeout(apply, 30); setTimeout(apply, 120); });
+  [0, 30, 80, 150, 250, 400, 600].forEach(delay => setTimeout(apply, delay));
+  requestAnimationFrame(apply);
+
+  let guardCount = 0;
+  const guardId = setInterval(()=>{
+    apply();
+    guardCount++;
+    if(guardCount > 15) clearInterval(guardId);
+  }, 100);
 }
 
 const _openDetailForCalScroll = window.openDetailByName;
