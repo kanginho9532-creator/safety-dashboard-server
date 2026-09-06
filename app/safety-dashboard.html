@@ -508,8 +508,10 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 .schedule-move-bar.show{display:flex;}
 .schedule-move-bar button{border:none;border-radius:999px;padding:6px 12px;background:#ef4444;color:#fff;font-weight:700;cursor:pointer;font-size:12px;}
 .detail-category-row{margin:12px 0 14px;padding:12px 14px;background:#f8fafc;border:1.5px solid var(--border);border-radius:10px;}
-.schedule-section{max-height:72vh;}
-.section-cards{max-height:calc(72vh - 90px);overflow-y:auto;padding-right:6px;}
+..schedule-section{max-height:72vh;overflow:hidden;}
+.section-cards{display:flex !important;flex-direction:column !important;flex-wrap:nowrap !important;overflow-x:hidden !important;overflow-y:auto !important;max-height:calc(72vh - 130px);padding-right:6px;width:100%;box-sizing:border-box;}
+.section-cards > *{width:100%;box-sizing:border-box;}
+.schedule-search{width:100%;box-sizing:border-box;padding:8px 10px;margin-bottom:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:12.5px;}
 .section-cards::-webkit-scrollbar{width:6px;}
 .section-cards::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px;}
 
@@ -4578,6 +4580,15 @@ function buildScheduleCard(item){
   return div;
 }
 
+let scheduleSearchQuery = {daily:'',weekly:'',monthly:'',sudden:'',reply:''};
+
+function matchesScheduleQuery(item, query){
+  if(!query) return true;
+  const q = query.toLowerCase();
+  const fields = [item.s.name, item.s.company, item.s.managerName, item.s.manager, item.s.supervisor, item.s.site, item.s.region];
+  return fields.some(f => f && String(f).toLowerCase().includes(q));
+}
+
 const originalRenderScheduleBoard = window.renderScheduleBoard;
 window.renderScheduleBoard = function(){
   try{
@@ -4596,25 +4607,41 @@ window.renderScheduleBoard = function(){
     });
 
     const sectionMap = [
-      ['daily','cards-daily','count-daily','매일 작업으로 지정된 공사가 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.'],
-      ['weekly','cards-weekly','count-weekly','주간 작업으로 지정된 공사가 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.'],
-      ['monthly','cards-monthly','count-monthly','월간 작업으로 지정된 공사가 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.'],
+      ['daily','cards-daily','count-daily','매일 작업으로 지정된 공사가 없습니다.'],
+      ['weekly','cards-weekly','count-weekly','주간 작업으로 지정된 공사가 없습니다.'],
+      ['monthly','cards-monthly','count-monthly','월간 작업으로 지정된 공사가 없습니다.'],
       ['sudden','cards-sudden','count-sudden','등록된 불시 작업이 없습니다.'],
-      ['reply','cards-reply','count-reply','연락 회신 작업으로 지정된 공사가 없습니다. 카드를 클릭한 뒤 이 칸을 클릭하세요.']
+      ['reply','cards-reply','count-reply','연락 회신 작업으로 지정된 공사가 없습니다.']
     ];
     sectionMap.forEach(([key,elId,countId,emptyMsg])=>{
-      const list = buckets[key];
+      const fullList = buckets[key];
       const el = document.getElementById(elId);
       const countEl = document.getElementById(countId);
-      if(countEl) countEl.textContent = list.length;
-      if(el){
-        el.innerHTML = '';
-        if(!list.length){
-          const empty = document.createElement('div'); empty.className='empty'; empty.textContent = emptyMsg;
-          el.appendChild(empty);
-        } else {
-          list.forEach(item => el.appendChild(buildScheduleCard(item)));
-        }
+      if(countEl) countEl.textContent = fullList.length;
+      if(!el) return;
+
+      const section = el.closest('.schedule-section');
+      if(section && !section.querySelector('.schedule-search')){
+        const search = document.createElement('input');
+        search.type = 'text';
+        search.className = 'schedule-search';
+        search.placeholder = '🔍 공사명/회사명/감독자 검색';
+        search.addEventListener('input', ()=>{ scheduleSearchQuery[key] = search.value; window.renderScheduleBoard(); });
+        section.insertBefore(search, el);
+        search.value = scheduleSearchQuery[key] || '';
+      } else if(section){
+        const search = section.querySelector('.schedule-search');
+        if(search && search.value !== scheduleSearchQuery[key]) search.value = scheduleSearchQuery[key] || '';
+      }
+
+      const list = fullList.filter(item => matchesScheduleQuery(item, scheduleSearchQuery[key]));
+      el.innerHTML = '';
+      if(!list.length){
+        const empty = document.createElement('div'); empty.className='empty';
+        empty.textContent = fullList.length ? '검색 결과가 없습니다.' : emptyMsg;
+        el.appendChild(empty);
+      } else {
+        list.forEach(item => el.appendChild(buildScheduleCard(item)));
       }
     });
 
