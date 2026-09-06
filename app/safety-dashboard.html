@@ -4731,18 +4731,27 @@ if(document.getElementById('cards-daily')) window.renderScheduleBoard();
 document.querySelectorAll('#schedule .panel').forEach(p=>{ if(p.querySelector('#stat-table')) p.style.display='none'; });
 
 let calendarScrollSnapshot = null;
+
 function captureCalendarScroll(){
-  const containers = document.querySelectorAll('#calendar, #contact-calendar, .cal-grid, .side-list, .side-section, .calendar');
-  calendarScrollSnapshot = Array.from(containers).map(el => ({ el, top: el.scrollTop }));
+  const all = [{ el: window, top: window.scrollY }, { el: document.documentElement, top: document.documentElement.scrollTop }, { el: document.body, top: document.body.scrollTop }];
+  document.querySelectorAll('*').forEach(el=>{
+    if(el.scrollTop > 0) all.push({ el, top: el.scrollTop, cls: el.className });
+  });
+  calendarScrollSnapshot = all;
 }
+
 function restoreCalendarScroll(){
   if(!calendarScrollSnapshot) return;
   const snap = calendarScrollSnapshot;
-  requestAnimationFrame(()=>{
-    setTimeout(()=>{
-      snap.forEach(({el, top})=>{ if(document.body.contains(el)) el.scrollTop = top; });
-    }, 0);
-  });
+  const apply = ()=>{
+    snap.forEach(({el, top})=>{
+      try{
+        if(el === window) window.scrollTo(0, top);
+        else if(document.body.contains(el)) el.scrollTop = top;
+      }catch(e){}
+    });
+  };
+  requestAnimationFrame(()=>{ apply(); setTimeout(apply, 30); setTimeout(apply, 120); });
 }
 
 const _openDetailForCalScroll = window.openDetailByName;
