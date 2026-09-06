@@ -456,6 +456,27 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 
 
 .drag-card-contact{display:block;font-size:11px;color:#b45309;margin-top:3px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.schedule-section{border-radius:14px;padding:14px;margin-bottom:14px;border:1.5px solid var(--border);}
+.schedule-section h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:15px;}
+.schedule-section .badge{border-radius:999px;padding:2px 10px;font-size:12px;font-weight:800;color:#fff;}
+.section-cards{display:flex;flex-wrap:wrap;gap:8px;}
+.section-cards > *{border-radius:14px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;}
+.schedule-section[data-section="daily"]{background:#eff6ff;}
+.schedule-section[data-section="daily"] .badge{background:#2563eb;}
+.schedule-section[data-section="daily"] .section-cards > *{background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe;}
+.schedule-section[data-section="weekly"]{background:#f0fdf4;}
+.schedule-section[data-section="weekly"] .badge{background:#16a34a;}
+.schedule-section[data-section="weekly"] .section-cards > *{background:#dcfce7;color:#15803d;border-color:#bbf7d0;}
+.schedule-section[data-section="monthly"]{background:#faf5ff;}
+.schedule-section[data-section="monthly"] .badge{background:#8b5cf6;}
+.schedule-section[data-section="monthly"] .section-cards > *{background:#ede9fe;color:#6d28d9;border-color:#ddd6fe;}
+.schedule-section[data-section="sudden"]{background:#fef2f2;}
+.schedule-section[data-section="sudden"] .badge{background:#ef4444;}
+.schedule-section[data-section="sudden"] .section-cards > *{background:#fee2e2;color:#b91c1c;border-color:#fecaca;}
+.schedule-section[data-section="reply"]{background:#fff7ed;}
+.schedule-section[data-section="reply"] .badge{background:#f59e0b;}
+.schedule-section[data-section="reply"] .section-cards > *{background:#ffedd5;color:#c2410c;border-color:#fed7aa;}
+.section-cards .empty{background:transparent!important;border:1px dashed #cbd5e1!important;color:#94a3b8!important;cursor:default;}
 
 </style>
 </head>
@@ -3107,7 +3128,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(!site) return;
     currentDetailSiteName = site.name;
     const titleEl = document.getElementById('detail-title');
-    titleEl.innerHTML = '<div class="detail-title-edit"><input id="detail-title-input" class="detail-edit-input" value="' + escapeAttr(site.name || '') + '"><span class="detail-live-badge">실시간 수정 · 노션 즉시 반영</span></div>';
+    titleEl.innerHTML = '<div class="detail-title-edit"><textarea id="detail-title-input" class="detail-edit-input detail-title-textarea" rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';">공사명내용</textarea>
     renderDetailEditableField('detail-manager-company', 'detail-company-input', 'text', site.company || '', '<button type="button" class="detail-inline-link-btn" onclick="openCompanyFromDetail()">회사 카드 열기</button>');
     renderDetailEditableField('detail-manager-site', 'detail-site-input-top', 'text', site.site || site.region || '');
     renderDetailEditableField('detail-manager-name', 'detail-manager-name-input', 'text', site.managerName || '');
@@ -4132,7 +4153,7 @@ document.addEventListener('DOMContentLoaded', () => {
     currentDetailSiteName = site.name;
     ensureDetailAuxBlocks();
     const titleEl = document.getElementById('detail-title');
-    titleEl.innerHTML = '<div class="detail-title-edit"><input id="detail-title-input" class="detail-edit-input" value="' + escapeAttr(site.name || '') + '"><span class="detail-live-badge">실시간 수정 · 노션 즉시 반영</span></div>';
+    titleEl.innerHTML = '<div class="detail-title-edit">'<textarea id="detail-title-input" class="detail-edit-input detail-title-textarea" rows="1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';">'+escapeHtml(site.name)+'</textarea>'
     renderDetailEditableField('detail-manager-company', 'detail-company-input', 'text', site.company || '', '<button type="button" class="detail-inline-link-btn" onclick="openCompanyFromDetail()">회사 카드 열기</button>');
     renderDetailEditableField('detail-manager-site', 'detail-site-input-top', 'text', site.site || site.region || '');
     renderDetailEditableField('detail-manager-name', 'detail-manager-name-input', 'text', site.managerName || '');
@@ -4424,6 +4445,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 })();
+(function(){
+  const SCROLL_SELECTORS = ['.dash-scroll','.side-list','.side-section','.table-wrap','.section-cards','.cal-cell','.modal-box','.detail-scroll-shell','.completion-list','.ai-week-grid','.calendar-summary-list','.date-rail'];
+  const mem = new WeakMap();
+  function track(el){
+    if(!el || mem.has(el)) return;
+    mem.set(el, {top:el.scrollTop, left:el.scrollLeft});
+    el.addEventListener('scroll', ()=>mem.set(el, {top:el.scrollTop, left:el.scrollLeft}), {passive:true});
+  }
+  function scan(){ SCROLL_SELECTORS.forEach(sel=>document.querySelectorAll(sel).forEach(track)); }
+  function restore(){
+    SCROLL_SELECTORS.forEach(sel=>document.querySelectorAll(sel).forEach(el=>{
+      const pos = mem.get(el);
+      if(pos){ if(el.scrollTop!==pos.top) el.scrollTop=pos.top; if(el.scrollLeft!==pos.left) el.scrollLeft=pos.left; }
+      else track(el);
+    }));
+  }
+  new MutationObserver(()=>requestAnimationFrame(restore)).observe(document.body, {childList:true, subtree:true});
+  window.addEventListener('load', scan);
+  scan();
+})();
 
 </script>
 <script>
@@ -4499,5 +4540,25 @@ window.submitSuddenWork=function(){
   renderScheduleBoard();
   if(typeof fetch==='function'){fetch('/api/ai-command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'sudden-work',siteName:sn,desc:desc,priority:pr})}).catch(()=>{});}
 };
+(function(){
+  const SCROLL_SELECTORS = ['.dash-scroll','.side-list','.side-section','.table-wrap','.section-cards','.cal-cell','.modal-box','.detail-scroll-shell','.completion-list','.ai-week-grid','.calendar-summary-list','.date-rail'];
+  const mem = new WeakMap();
+  function track(el){
+    if(!el || mem.has(el)) return;
+    mem.set(el, {top:el.scrollTop, left:el.scrollLeft});
+    el.addEventListener('scroll', ()=>mem.set(el, {top:el.scrollTop, left:el.scrollLeft}), {passive:true});
+  }
+  function scan(){ SCROLL_SELECTORS.forEach(sel=>document.querySelectorAll(sel).forEach(track)); }
+  function restore(){
+    SCROLL_SELECTORS.forEach(sel=>document.querySelectorAll(sel).forEach(el=>{
+      const pos = mem.get(el);
+      if(pos){ if(el.scrollTop!==pos.top) el.scrollTop=pos.top; if(el.scrollLeft!==pos.left) el.scrollLeft=pos.left; }
+      else track(el);
+    }));
+  }
+  new MutationObserver(()=>requestAnimationFrame(restore)).observe(document.body, {childList:true, subtree:true});
+  window.addEventListener('load', scan);
+  scan();
+})();
 </script></body>
 </html>
