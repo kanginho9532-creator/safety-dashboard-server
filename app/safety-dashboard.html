@@ -1098,8 +1098,6 @@ const curYear = now.getFullYear();
 
 
 function countThisMonth(dates){ return (dates||[]).filter(d=>{ const dt=new Date(d); return dt.getFullYear()===curYear && dt.getMonth()===curMonth; }).length; }
-function getUnvisitedThisMonth(){ return sites.filter(s=> countThisMonth(visitStore[s.name]) < MONTHLY_TARGET ); }
-function getNeverVisited(){ return sites.filter(s=> s.visits===0 && (visitStore[s.name]||[]).length===0 ); }
 function refreshKPIs(){ document.getElementById('kpi-total').textContent=sites.length; document.getElementById('kpi-unvisited').textContent=getUnvisitedThisMonth().length; document.getElementById('kpi-never').textContent=getNeverVisited().length; const totalMonthlyVisits=sites.reduce((sum,s)=>sum+countThisMonth(visitStore[s.name]),0); document.getElementById('kpi-monthly-visits').textContent=totalMonthlyVisits; }
 
 
