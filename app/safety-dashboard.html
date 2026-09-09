@@ -1088,13 +1088,11 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     activateDashboardPage(btn.dataset.page,true);
   });
 });
-activateDashboardPage(new URLSearchParams(window.location.search).get('page')||'dashboard',false);
-
-
 const now = new Date();
 now.setHours(0,0,0,0);
 const curMonth = now.getMonth();
 const curYear = now.getFullYear();
+activateDashboardPage(new URLSearchParams(window.location.search).get('page')||'dashboard',false);
 
 
 function countThisMonth(dates){ return (dates||[]).filter(d=>{ const dt=new Date(d); return dt.getFullYear()===curYear && dt.getMonth()===curMonth; }).length; }
@@ -4779,7 +4777,7 @@ function restoreCalendarScroll(){
   const guardId = setInterval(()=>{
     apply();
     guardCount++;
-    if(guardCount > 15) clearInterval(guardId);
+    if(guardCount > 30) clearInterval(guardId);
   }, 100);
 }
 
@@ -4790,6 +4788,18 @@ window.openDetailByName = function(name){
   restoreCalendarScroll();
   return r;
 };
+
+const _refreshCalForScroll = (typeof refreshCalendars === 'function') ? refreshCalendars : window.refreshCalendars;
+if(typeof _refreshCalForScroll === 'function'){
+  window.refreshCalendars = function(){
+    const modalOpen = !!document.querySelector('#detail-modal.active');
+    if(modalOpen) captureCalendarScroll();
+    const r = _refreshCalForScroll.apply(this, arguments);
+    if(modalOpen) restoreCalendarScroll();
+    return r;
+  };
+  refreshCalendars = window.refreshCalendars;
+}
 
 const _closeDetailForCalScroll = window.closeDetail;
 window.closeDetail = async function(){
