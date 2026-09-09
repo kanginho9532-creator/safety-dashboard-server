@@ -4732,10 +4732,23 @@ document.querySelectorAll('#schedule .panel').forEach(p=>{ if(p.querySelector('#
 
 let calendarScrollSnapshot = null;
 
+function getScrollStableKey(el){
+  if(el === window) return '__window__';
+  if(el.dataset && el.dataset.date){
+    const kind = el.closest('#cal-grid') ? 'visit' : el.closest('#cal-grid-contact') ? 'contact' : 'other';
+    return 'date:' + el.dataset.date + ':' + kind;
+  }
+  if(el.id) return 'id:' + el.id;
+  return null;
+}
+
 function captureCalendarScroll(){
-  const all = [{ el: window, top: window.scrollY }, { el: document.documentElement, top: document.documentElement.scrollTop }, { el: document.body, top: document.body.scrollTop }];
+  const all = [{ key: '__window__', top: window.scrollY }];
   document.querySelectorAll('*').forEach(el=>{
-    if(el.scrollTop > 0) all.push({ el, top: el.scrollTop, cls: el.className });
+    if(el.scrollTop > 0){
+      const key = getScrollStableKey(el);
+      if(key) all.push({ key, top: el.scrollTop });
+    }
   });
   calendarScrollSnapshot = all;
 }
@@ -4744,15 +4757,25 @@ function restoreCalendarScroll(){
   if(!calendarScrollSnapshot) return;
   const snap = calendarScrollSnapshot;
   const apply = ()=>{
-    snap.forEach(({el, top})=>{
+    snap.forEach(({key, top})=>{
       try{
-        if(el === window) window.scrollTo(0, top);
-        else if(document.body.contains(el)) el.scrollTop = top;
+        if(key === '__window__'){ window.scrollTo(0, top); return; }
+        let el = null;
+        if(key.startsWith('date:')){
+          const parts = key.split(':');
+          const dateStr = parts[1], kind = parts[2];
+          const gridSel = kind === 'visit' ? '#cal-grid' : kind === 'contact' ? '#cal-grid-contact' : null;
+          if(gridSel) el = document.querySelector(gridSel + ' [data-date="' + dateStr + '"]');
+        } else if(key.startsWith('id:')){
+          el = document.getElementById(key.slice(3));
+        }
+        if(el) el.scrollTop = top;
       }catch(e){}
     });
   };
   [0, 30, 80, 150, 250, 400, 600].forEach(delay => setTimeout(apply, delay));
   requestAnimationFrame(apply);
+}
 
   let guardCount = 0;
   const guardId = setInterval(()=>{
