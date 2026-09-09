@@ -1623,6 +1623,7 @@ const API_BASE="";
 function normalizeSite(s){ return { name:s.name||"이름없음", company:s.company||"", visits:(s.visitDates&&s.visitDates.length)||s.visits||0, targetVisits:s.targetVisits||s.visits||2, lastVisit:s.lastVisit||null, visitDates:s.visitDates||(s.lastVisit?[s.lastVisit]:[]), contactDates:s.contactDates||(s.contactRequest?[s.contactRequest]:[]), contact:s.contact||"", managerName:s.managerName||s.manager||"", address:s.address||"", start:s.start||null, end:s.end||null, contractDate:s.contractDate||null, amount:s.amount||0, contactRequest:s.contactRequest||null, status:s.status||"", note:s.note||"", bizOpenNo:s.bizOpenNo||"", bizMgmtNo:s.bizMgmtNo||"", mgmtNo:s.mgmtNo||"", site:s.site||s.region||(s.address||'').split(' ')[0]||'기타', lastEdited:s.lastEdited||new Date().toISOString(), createdAt:s.createdAt||s['생성 일시']||s.lastEdited||new Date().toISOString(), notionId:s.id||(s.pageIds&&s.pageIds[0])||null, pageDetails:s.pageDetails||[], pageIds:s.pageIds||(s.id?[s.id]:[]), visitHistoryPageId:s.visitHistoryPageId||s.id||null, contactHistoryPageId:s.contactHistoryPageId||s.id||null, rawProperties:s.rawProperties||{}, photoUrls:Array.isArray(s.photoUrls)?s.photoUrls:[] }; }
 function rebuildStoresFromSites(){ sites.forEach(s=>{ visitStore[s.name]=(s.visitDates&&s.visitDates.length)?s.visitDates.slice():(visitStore[s.name]||[]); contactStore[s.name]=(s.contactDates&&s.contactDates.length)?s.contactDates.slice():(contactStore[s.name]||[]); }); saveStore(STORE_KEY,visitStore); saveStore(CONTACT_KEY,contactStore); }
 
+async 
 async function syncFromNotion(){ await loadFromNotion(); }
 
 
@@ -4795,30 +4796,6 @@ const _closeDetailForCalScroll = window.closeDetail;
 window.closeDetail = async function(){
   captureCalendarScroll();
   const r = await _closeDetailForCalScroll.apply(this, arguments);
-  restoreCalendarScroll();
-  return r;
-};
-
-const _openCompanyModalForScroll = window.openCompanyModalByName;
-window.openCompanyModalByName = function(){
-  captureCalendarScroll();
-  const r = _openCompanyModalForScroll.apply(this, arguments);
-  restoreCalendarScroll();
-  return r;
-};
-
-const _closeCompanyModalForScroll = window.closeCompanyModal;
-window.closeCompanyModal = function(){
-  captureCalendarScroll();
-  const r = _closeCompanyModalForScroll.apply(this, arguments);
-  restoreCalendarScroll();
-  return r;
-};
-
-const _requestCloseCompanyModalForScroll = window.requestCloseCompanyModal;
-window.requestCloseCompanyModal = function(){
-  captureCalendarScroll();
-  const r = _requestCloseCompanyModalForScroll.apply(this, arguments);
   restoreCalendarScroll();
   return r;
 };
