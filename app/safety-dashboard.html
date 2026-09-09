@@ -1065,7 +1065,9 @@ function activateDashboardPage(pageId,updateUrl){
       else { calStateContact = {year:curYear, month:curMonth}; }
       lastFocusedCellDate = null;
       lastFocusedGridId = null;
+      window.__suppressScrollRestore = true;
       refreshCalendars();
+      window.__suppressScrollRestore = false;
       setTimeout(()=>{
         const gridId = pageId === 'calendar' ? 'cal-grid' : 'cal-grid-contact';
         const grid = document.getElementById(gridId);
@@ -4753,7 +4755,13 @@ function captureCalendarScroll(){
 function restoreCalendarScroll(){
   if(!calendarScrollSnapshot) return;
   const snap = calendarScrollSnapshot;
+  let cancelled = false;
+  const cancel = ()=>{ cancelled = true; };
+  window.addEventListener('wheel', cancel, {passive:true});
+  window.addEventListener('touchmove', cancel, {passive:true});
+  const cleanup = ()=>{ window.removeEventListener('wheel', cancel); window.removeEventListener('touchmove', cancel); };
   const apply = ()=>{
+    if(cancelled) return;
     snap.forEach(({key, top})=>{
       try{
         if(key === '__window__'){ window.scrollTo(0, top); return; }
@@ -4775,9 +4783,10 @@ function restoreCalendarScroll(){
 
   let guardCount = 0;
   const guardId = setInterval(()=>{
+    if(cancelled){ clearInterval(guardId); cleanup(); return; }
     apply();
     guardCount++;
-    if(guardCount > 30) clearInterval(guardId);
+    if(guardCount > 30){ clearInterval(guardId); cleanup(); }
   }, 100);
 }
 
@@ -4792,10 +4801,12 @@ window.openDetailByName = function(name){
 const _refreshCalForScroll = (typeof refreshCalendars === 'function') ? refreshCalendars : window.refreshCalendars;
 if(typeof _refreshCalForScroll === 'function'){
   window.refreshCalendars = function(){
-    const modalOpen = !!document.querySelector('#detail-modal.active');
-    if(modalOpen) captureCalendarScroll();
+    if(window.__suppressScrollRestore){
+      return _refreshCalForScroll.apply(this, arguments);
+    }
+    captureCalendarScroll();
     const r = _refreshCalForScroll.apply(this, arguments);
-    if(modalOpen) restoreCalendarScroll();
+    restoreCalendarScroll();
     return r;
   };
   refreshCalendars = window.refreshCalendars;
