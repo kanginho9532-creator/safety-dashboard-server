@@ -4798,5 +4798,29 @@ window.closeDetail = async function(){
   restoreCalendarScroll();
   return r;
 };
+
+const _openCompanyModalForScroll = window.openCompanyModalByName;
+window.openCompanyModalByName = function(){
+  captureCalendarScroll();
+  const r = _openCompanyModalForScroll.apply(this, arguments);
+  restoreCalendarScroll();
+  return r;
+};
+
+const _closeCompanyModalForScroll = window.closeCompanyModal;
+window.closeCompanyModal = function(){
+  captureCalendarScroll();
+  const r = _closeCompanyModalForScroll.apply(this, arguments);
+  restoreCalendarScroll();
+  return r;
+};
+
+const _requestCloseCompanyModalForScroll = window.requestCloseCompanyModal;
+window.requestCloseCompanyModal = function(){
+  captureCalendarScroll();
+  const r = _requestCloseCompanyModalForScroll.apply(this, arguments);
+  restoreCalendarScroll();
+  return r;
+};
 </script></body>
 </html>
