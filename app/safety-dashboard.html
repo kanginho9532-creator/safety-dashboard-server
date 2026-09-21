@@ -3199,6 +3199,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const titleEl = document.getElementById('detail-title');
     titleEl.innerHTML = '<div class="detail-title-edit"><textarea id="detail-title-input" class="detail-edit-input detail-title-textarea" rows="1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';">' + escapeHtml(site.name) + '</textarea><span class="detail-live-badge">🟢 실시간 저장 켜짐</span></div>';
     renderDetailEditableField('detail-manager-company', 'detail-company-input', 'text', site.company || '', '<button type="button" class="detail-inline-link-btn" onclick="openCompanyFromDetail()">회사 카드 열기</button>');
+    try{ const mc = document.getElementById('detail-manager-company'); if(mc){ mc.style.cursor='pointer'; mc.style.textDecoration='underline'; mc.onclick = function(ev){ if(ev.target && (ev.target.tagName==='INPUT' || ev.target.tagName==='TEXTAREA')) return; openCompanyFromDetail(); }; } }catch(e){}
     renderDetailEditableField('detail-manager-site', 'detail-site-input-top', 'text', site.site || site.region || '');
     renderDetailEditableField('detail-manager-name', 'detail-manager-name-input', 'text', site.managerName || '');
     renderDetailEditableField('detail-manager-contact', 'detail-manager-contact-input', 'text', site.contact || '', normalizePhone(site.contact) ? '<div class="detail-inline-help"><a class="detail-call-link" href="tel:' + normalizePhone(site.contact) + '">전화 걸기</a></div>' : '<div class="detail-inline-help">전화번호를 입력하면 모바일에서 바로 연결할 수 있습니다.</div>');
@@ -3509,11 +3510,10 @@ document.addEventListener('DOMContentLoaded', () => {
       title = '긴급 연락 필요 · 공사 ' + arr.length + '건 / 회사 ' + list.length + '곳';
       subtitle = '연락요청 일정도 없고 비고도 없는 진행중 공사만 모았습니다. 회사명을 누르면 해당 공사 목록이 열립니다.';
     } else if(kind === 'completed-month'){
-      const allSites = dedupeSitesByName(sites);
-      const arr = allSites.filter(isCompletedSite);
-      list = arr.map(site => ({ name: site.name, sub: (site.company||'-') + ' · 완료체크 ' + (site.completedAt || (site.lastEdited ? String(site.lastEdited).slice(0,10) : '') || site.end || '-'), region: site.site || site.region || '', site: site.site || site.region || '' }));
-      title = '전체 공사완료 · ' + arr.length + '건';
-      subtitle = '완료 체크된 전체 공사 목록. 지역 검색 가능.';
+      const arr = getMonthlyCompletedSites();
+      list = arr.map(site => ({ name: site.name, sub: (site.company||'-') + ' · 완료체크 ' + (site.completedAt || site.end || '-'), region: site.site || site.region || '', site: site.site || site.region || '' }));
+      title = '이번달 공사완료 · ' + arr.length + '건';
+      subtitle = '이번달에 공사완료 처리된 공사 목록(준공일 기준). 지역 검색 가능.';
     }
     kpiListData = list;
     document.getElementById('kpi-list-title').textContent = title;
@@ -4224,6 +4224,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const titleEl = document.getElementById('detail-title');
     titleEl.innerHTML = '<div class="detail-title-edit"><textarea id="detail-title-input" class="detail-edit-input detail-title-textarea" rows="1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';">' + escapeHtml(site.name) + '</textarea><span class="detail-live-badge">🟢 실시간 저장 켜짐</span></div>';
     renderDetailEditableField('detail-manager-company', 'detail-company-input', 'text', site.company || '', '<button type="button" class="detail-inline-link-btn" onclick="openCompanyFromDetail()">회사 카드 열기</button>');
+    try{ const mc = document.getElementById('detail-manager-company'); if(mc){ mc.style.cursor='pointer'; mc.style.textDecoration='underline'; mc.onclick = function(ev){ if(ev.target && (ev.target.tagName==='INPUT' || ev.target.tagName==='TEXTAREA')) return; openCompanyFromDetail(); }; } }catch(e){}
     renderDetailEditableField('detail-manager-site', 'detail-site-input-top', 'text', site.site || site.region || '');
     renderDetailEditableField('detail-manager-name', 'detail-manager-name-input', 'text', site.managerName || '');
     renderDetailEditableField('detail-manager-contact', 'detail-manager-contact-input', 'text', site.contact || '', normalizePhone(site.contact) ? '<div class="detail-inline-help"><a class="detail-call-link" href="tel:' + normalizePhone(site.contact) + '">전화 걸기</a></div>' : '<div class="detail-inline-help">전화번호를 입력하면 모바일에서 바로 연결할 수 있습니다.</div>');
@@ -4835,6 +4836,14 @@ window.closeDetail = async function(){
 
 if (typeof window.getSiteByName !== 'function') {
   window.getSiteByName = function(name){ return (sites || []).find(s => s.name === name) || null; };
+}
+if (typeof window.bringModalToFront === 'function') {
+  document.addEventListener('pointerdown', function(ev){
+    try{
+      const ov = ev.target && ev.target.closest ? ev.target.closest('.modal-overlay.active, .modal.active') : null;
+      if(ov) window.bringModalToFront(ov);
+    }catch(e){}
+  }, true);
 }
 </script></body>
 </html>
