@@ -1017,6 +1017,18 @@ function loadStore(key){ try{ const raw=JSON.parse(localStorage.getItem(key))||{
 function saveStore(key,data){ localStorage.setItem(key, JSON.stringify(data)); }
 
 
+
+
+if(!localStorage.getItem('storeVersion_v6')){
+  try{
+    localStorage.removeItem(STORE_KEY);
+    localStorage.removeItem(CONTACT_KEY);
+    localStorage.removeItem('visitPageMapStore');
+    localStorage.removeItem('contactPageMapStore');
+  }catch(e){}
+  localStorage.setItem('storeVersion_v6','1');
+}
+
 let visitStore = loadStore(STORE_KEY);
 let contactStore = loadStore(CONTACT_KEY);
 sites.forEach(s=>{ if(!(s.name in visitStore)) visitStore[s.name]=s.lastVisit?[s.lastVisit]:[]; if(!(s.name in contactStore)) contactStore[s.name]=s.contactRequest?[s.contactRequest]:[]; });
@@ -1621,7 +1633,7 @@ function sendChat(){ const input=document.getElementById('chat-input'); const te
 
 const API_BASE="";
 function normalizeSite(s){ return { name:s.name||"이름없음", company:s.company||"", visits:(s.visitDates&&s.visitDates.length)||s.visits||0, targetVisits:s.targetVisits||s.visits||2, lastVisit:s.lastVisit||null, visitDates:s.visitDates||(s.lastVisit?[s.lastVisit]:[]), contactDates:s.contactDates||(s.contactRequest?[s.contactRequest]:[]), contact:s.contact||"", managerName:s.managerName||s.manager||"", address:s.address||"", start:s.start||null, end:s.end||null, contractDate:s.contractDate||null, amount:s.amount||0, contactRequest:s.contactRequest||null, status:s.status||"", note:s.note||"", bizOpenNo:s.bizOpenNo||"", bizMgmtNo:s.bizMgmtNo||"", mgmtNo:s.mgmtNo||"", site:s.site||s.region||(s.address||'').split(' ')[0]||'기타', lastEdited:s.lastEdited||new Date().toISOString(), createdAt:s.createdAt||s['생성 일시']||s.lastEdited||new Date().toISOString(), notionId:s.id||(s.pageIds&&s.pageIds[0])||null, pageDetails:s.pageDetails||[], pageIds:s.pageIds||(s.id?[s.id]:[]), visitHistoryPageId:s.visitHistoryPageId||s.id||null, contactHistoryPageId:s.contactHistoryPageId||s.id||null, rawProperties:s.rawProperties||{}, photoUrls:Array.isArray(s.photoUrls)?s.photoUrls:[] }; }
-function rebuildStoresFromSites(){ sites.forEach(s=>{ visitStore[s.name]=(s.visitDates&&s.visitDates.length)?s.visitDates.slice():(visitStore[s.name]||[]); contactStore[s.name]=(s.contactDates&&s.contactDates.length)?s.contactDates.slice():(contactStore[s.name]||[]); }); saveStore(STORE_KEY,visitStore); saveStore(CONTACT_KEY,contactStore); }
+function rebuildStoresFromSites(){ sites.forEach(s=>{ visitStore[s.name]=Array.isArray(s.visitDates)?s.visitDates.slice():(visitStore[s.name]||[]); contactStore[s.name]=Array.isArray(s.contactDates)?s.contactDates.slice():(contactStore[s.name]||[]); }); saveStore(STORE_KEY,visitStore); saveStore(CONTACT_KEY,contactStore); }
 
 async function syncFromNotion(){ await loadFromNotion(); }
 
@@ -3000,6 +3012,7 @@ document.addEventListener('DOMContentLoaded', () => {
     for(const cand of ['공사완료','공사 완료','완료','completed']){
       const key = Object.keys(props).find(k => k.replace(/\s+/g,'').toLowerCase().includes(String(cand).replace(/\s+/g,'').toLowerCase()));
       if(!key) continue;
+      if(/입력|전송|업로드/.test(key)) continue;
       const px = props[key];
       if(!px) continue;
       if(px.type === 'checkbox' && px.checkbox === true) return true;
@@ -3020,7 +3033,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function getMonthlyCompletedSites(){
     return dedupeSitesByName(Array.isArray(sites) ? sites : []).filter(site => {
       if(!isCompletedSite(site)) return false;
-      const ref = site.completedAt || (site.lastEdited ? String(site.lastEdited).slice(0,10) : null) || site.end;
+      const ref = site.completedAt || site.end;
       if(!ref) return false;
       const dt = new Date(ref);
       return dt.getFullYear() === curYear && dt.getMonth() === curMonth;
@@ -3245,7 +3258,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   window.refreshKPIs = function(){
     const allSites = dedupeSitesByName(sites);
-    document.getElementById('kpi-total').textContent = allSites.length;
+    document.getElementById('kpi-total').textContent = getDashboardSites().length;
     document.getElementById('kpi-unvisited').textContent = getUnvisitedThisMonth().length;
     document.getElementById('kpi-never').textContent = getNeverVisited().length;
     document.getElementById('kpi-completion').textContent = getCompletionSoon().length;
@@ -3254,7 +3267,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const missing = document.getElementById('kpi-contact-missing');
     if(missing) missing.textContent = getContactMissingSites().filter(site => !isCompletedSite(site)).length;
     const completedMonthly = document.getElementById('kpi-completed-month');
-    if(completedMonthly) completedMonthly.textContent = allSites.filter(isCompletedSite).length;
+    if(completedMonthly) completedMonthly.textContent = getMonthlyCompletedSites().length;
   };
   window.renderCompletionList = function(){
     const completionSoon = getCompletionSoon();
@@ -3468,7 +3481,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let subtitle = '회사명을 누르면 해당 공사 목록이 열립니다.';
     let list = [];
     if(kind === 'total'){
-      const allSites = dedupeSitesByName(sites);
+      const allSites = getDashboardSites();
       list = buildCompanyKpiList(allSites, bucket => '공사 ' + bucket.contractNames.length + '건', kind);
       title = '전체 현장 · 공사 ' + allSites.length + '건 / 회사 ' + list.length + '곳';
     } else if(kind === 'unvisited'){
@@ -4819,5 +4832,9 @@ window.closeDetail = async function(){
   restoreCalendarScroll();
   return r;
 };
+
+if (typeof window.getSiteByName !== 'function') {
+  window.getSiteByName = function(name){ return (sites || []).find(s => s.name === name) || null; };
+}
 </script></body>
 </html>

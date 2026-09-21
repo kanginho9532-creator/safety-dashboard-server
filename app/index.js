@@ -26,6 +26,7 @@ function isCompletedByCheckbox(properties) {
   for (const cand of COMPLETED_CHECKBOX_CANDIDATES) {
     const key = findPropertyKey(properties, [cand]);
     if (!key) continue;
+    if (/입력|전송|업로드/.test(key)) continue;
     const prop = properties[key];
     if (!prop) continue;
     if (prop.type === 'checkbox') return Boolean(prop.checkbox);
@@ -398,9 +399,8 @@ app.get('/api/contracts', async (req, res) => {
     const results = await queryAllPages(DB_ID);
     const rawSites = results.map(pageToSite);
     const completedNames = buildCompletedSiteNameSet(rawSites);
-    const filteredRawSites = rawSites.filter(s => !completedNames.has(s.name));
-    const sites = groupSites(filteredRawSites).map(s => ({ ...s, completed: false }));
-    const excluded = rawSites.length - filteredRawSites.length;
+    const sites = groupSites(rawSites);
+    const excluded = 0;
     res.json({ ok: true, count: sites.length, rawCount: rawSites.length, excludedByCompletion: excluded, completedSiteNames: Array.from(completedNames), sites });
   } catch (err) {
     console.error('contracts error:', err);
