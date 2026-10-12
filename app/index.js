@@ -440,10 +440,11 @@ app.post('/api/update-visit', async (req, res) => {
     if (!pageId || !propertyName || date === undefined) {
       return res.status(400).json({ ok: false, error: 'pageId, propertyName required, date must be a date string or null' });
     }
-    await notion.pages.update({
-      page_id: pageId,
-      properties: { [propertyName]: { date: date ? { start: date } : null } }
-    });
+    const dateProperties = { [propertyName]: { date: date ? { start: date } : null } };
+    if (['방문일자', '연락요청 일자'].includes(propertyName) && date) {
+      dateProperties['K2B등록여부'] = { checkbox: false };
+    }
+    await notion.pages.update({ page_id: pageId, properties: dateProperties });
     res.json({ ok: true, cleared: date === null });
   } catch (err) {
     console.error('update-visit error:', err);
@@ -465,6 +466,9 @@ app.post('/api/duplicate-page', async (req, res) => {
       if (cloned) newProperties[key] = cloned;
     }
     newProperties[propertyName] = { date: { start: date } };
+    if (['방문일자', '연락요청 일자'].includes(propertyName) && date) {
+      newProperties['K2B등록여부'] = { checkbox: false };
+    }
     const newPage = await notion.pages.create({ parent: { database_id: DB_ID }, properties: newProperties });
     res.json({ ok: true, newPageId: newPage.id });
   } catch (err) {
