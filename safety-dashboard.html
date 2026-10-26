@@ -536,16 +536,6 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 }
 
 </style>
-<style>
-#ai-week-grid{display:grid!important;grid-template-columns:repeat(7,minmax(150px,1fr))!important;grid-auto-flow:column!important;gap:8px!important;overflow-x:auto!important;align-items:start;}
-#ai-week-grid .ai-day{display:block!important;min-width:150px!important;margin:0!important;max-height:none!important;}
-#ai-week-grid .ai-visit-chip{white-space:pre-line!important;text-overflow:clip!important;overflow:visible!important;line-height:1.5!important;font:inherit;font-size:12px!important;text-align:left;border:1px solid #dbeafe;cursor:pointer;}
-.activity-section-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:14px 0 5px;font-size:12px;font-weight:700;}
-.activity-section-head button{border:1px solid #cbd5e1;background:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;color:#2563eb;white-space:nowrap;}
-.activity-preview{width:100%;background:transparent;border:0;border-bottom:1px dashed #e2e8f0;text-align:left;cursor:pointer;}
-.activity-full-row{width:100%;display:flex;flex-direction:column;align-items:stretch;text-align:left;}
-.activity-full-row strong,.activity-full-row span{white-space:pre-wrap!important;overflow:visible!important;text-overflow:clip!important;}
-</style>
 </head>
 <body>
 <div class="mobile-top-bar">
@@ -983,8 +973,25 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 <button onclick="syncFromNotion()" style="position:fixed;bottom:16px;left:16px;padding:10px 14px;background:#16a34a;color:white;border:none;border-radius:8px;cursor:pointer;z-index:400;">🔄 Notion 동기화</button>
 
 
-<script src="dashboard-rules.js"></script>
 <script>
+
+// Completion reporting follows latest representative status and edit MONTH, not planned end date.
+function completionDayKST(value){
+  if(!value)return '';
+  const text=String(value);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(text))return text;
+  const date=new Date(value);
+  return Number.isNaN(date.getTime())?'':new Date(date.getTime()+9*3600000).toISOString().slice(0,10);
+}
+function completionMonthKST(value){ return completionDayKST(value).slice(0,7); }
+function isLatestStatusCompleted(site){ return String(site&&site.status||'').replace(/\s+/g,'')==='공사완료'; }
+function isThisMonthCompleted(site,at=new Date()){
+  return isLatestStatusCompleted(site)&&completionMonthKST(site.lastEdited)===completionMonthKST(at);
+}
+function isSiteVisibleByCompletion(site,at=new Date()){
+  return !isLatestStatusCompleted(site)||isThisMonthCompleted(site,at);
+}
+
 function getHolidayName(year, month, day) {
     const m = month + 1;
     const fixed = {'1-1':'신정','3-1':'삼일절','5-5':'어린이날','6-6':'현충일','8-15':'광복절','10-3':'개천절','10-9':'한글날','12-25':'크리스마스'};
@@ -1117,10 +1124,10 @@ const now = new Date();
 now.setHours(0,0,0,0);
 const curMonth = now.getMonth();
 const curYear = now.getFullYear();
-document.addEventListener('DOMContentLoaded',()=>{activateDashboardPage(new URLSearchParams(window.location.search).get('page')||'dashboard',false);},{once:true});
+activateDashboardPage(new URLSearchParams(window.location.search).get('page')||'dashboard',false);
 
 
-function countThisMonth(dates){const month=DashboardRules.month(new Date());return DashboardRules.uniqueDates(dates).filter(d=>d.slice(0,7)===month).length;}
+function countThisMonth(dates){ return (dates||[]).filter(d=>{ const dt=new Date(d); return dt.getFullYear()===curYear && dt.getMonth()===curMonth; }).length; }
 
 
 
@@ -1645,10 +1652,9 @@ function sendChat(){ const input=document.getElementById('chat-input'); const te
 const API_BASE="";
 function normalizeSite(s){ return { name:s.name||"이름없음", company:s.company||"", visits:(s.visitDates&&s.visitDates.length)||s.visits||0, targetVisits:s.targetVisits||s.visits||2, lastVisit:s.lastVisit||null, visitDates:s.visitDates||(s.lastVisit?[s.lastVisit]:[]), contactDates:s.contactDates||(s.contactRequest?[s.contactRequest]:[]), contact:s.contact||"", managerName:s.managerName||s.manager||"", address:s.address||"", start:s.start||null, end:s.end||null, contractDate:s.contractDate||null, amount:s.amount||0, contactRequest:s.contactRequest||null, status:s.status||"", note:s.note||"", bizOpenNo:s.bizOpenNo||"", bizMgmtNo:s.bizMgmtNo||"", mgmtNo:s.mgmtNo||"", site:s.site||s.region||(s.address||'').split(' ')[0]||'기타', lastEdited:s.lastEdited||new Date().toISOString(), createdAt:s.createdAt||s['생성 일시']||s.lastEdited||new Date().toISOString(), notionId:s.id||(s.pageIds&&s.pageIds[0])||null, pageDetails:s.pageDetails||[], pageIds:s.pageIds||(s.id?[s.id]:[]), visitHistoryPageId:s.visitHistoryPageId||s.id||null, contactHistoryPageId:s.contactHistoryPageId||s.id||null, rawProperties:s.rawProperties||{}, photoUrls:Array.isArray(s.photoUrls)?s.photoUrls:[] }; }
 function rebuildStoresFromSites(){
- visitStore={}; contactStore={}; visitPageMap={}; contactPageMap={};
- sites.forEach(s=>{visitStore[s.name]=DashboardRules.uniqueDates(s.visitDates);contactStore[s.name]=DashboardRules.uniqueDates(s.contactDates);});
+ visitStore={};contactStore={};
+ sites.forEach(s=>{visitStore[s.name]=Array.isArray(s.visitDates)?s.visitDates.slice():[];contactStore[s.name]=Array.isArray(s.contactDates)?s.contactDates.slice():[];});
  saveStore(STORE_KEY,visitStore);saveStore(CONTACT_KEY,contactStore);
- saveStore(VISIT_PAGEMAP_KEY,visitPageMap);saveStore(CONTACT_PAGEMAP_KEY,contactPageMap);
 }
 
 
@@ -2268,14 +2274,13 @@ function openDetailByName(name){
 }
 async function loadFromNotion(){
   try{
-    const res=await fetch(API_BASE + '/api/contracts');
+    const res=await fetch(API_BASE + '/api/contracts', {cache:'no-store'});
     const data=await res.json();
-    if(!res.ok || !data.ok || !Array.isArray(data.sites)) throw new Error(data.error || 'Notion 데이터 조회 실패');
-    sites = data.sites.filter(s=>DashboardRules.visible(s)).map(normalizeSite);
-    window.dashboardSyncedAt = new Date().toISOString();
+    if(!res.ok || !data.ok || !Array.isArray(data.sites)) throw new Error(data.error || 'Notion 조회 실패');
+    sites = data.sites.filter(s=>isSiteVisibleByCompletion(s)).map(normalizeSite);
   }catch(e){
     console.error('loadFromNotion error:', e);
-    showSyncBanner('동기화 실패: 최신 데이터가 아닐 수 있습니다. '+e.message, '#dc2626');
+    showSyncBanner('Notion 동기화 실패 — 최신 데이터가 아닐 수 있습니다: '+e.message, '#dc2626');
     return;
   }
   initAllViews();
@@ -2638,7 +2643,7 @@ document.addEventListener('DOMContentLoaded', () => {
       let cells = '<td class="sticky-col sticky-site-col">' + siteTag(site) + noteHtml + '</td>'
         + '<td class="sticky-col sticky-company-col">' + escapeHtml(site.company || '-') + '</td>';
       for(let month=1; month<=12; month++){
-        const count = (visitStore[site.name] || []).filter(date => String(date).slice(0,7) === DashboardRules.month(new Date()).slice(0,4)+'-'+String(month).padStart(2,'0')).length;
+        const count = (visitStore[site.name] || []).filter(date => new Date(date).getMonth() + 1 === month).length;
         cells += '<td class="month-cell" style="background:' + (count > 0 ? '#dbeafe' : 'transparent') + ';color:' + (count > 0 ? '#1d4ed8' : 'inherit') + ';font-weight:800;">' + (count > 0 ? '★'.repeat(count) : '') + '</td>';
       }
       return '<tr>' + cells + '</tr>';
@@ -3022,11 +3027,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const COMPLETED_STATUS_KEYWORDS = ['완료','준공완료','공사완료','공사 완료','종료','종결'];
   let currentDetailSiteName = null;
   let calendarAddState = { storeType: 'visit', dateStr: '', query: '' };
-  function isCompletedSite(site){ return DashboardRules.completed(site); }
+  function isCompletedSite(site){return isLatestStatusCompleted(site);}
   function getDashboardSites(){
-    return dedupeSitesByName(Array.isArray(sites) ? sites : []).filter(site => DashboardRules.visible(site) && !isCompletedSite(site));
+    return dedupeSitesByName(Array.isArray(sites) ? sites : []).filter(site => !isCompletedSite(site));
   }
-  function getMonthlyCompletedSites(){ return dedupeSitesByName(sites).filter(site=>DashboardRules.currentCompleted(site)); }
+  function getMonthlyCompletedSites(){return dedupeSitesByName(sites).filter(site=>isThisMonthCompleted(site));}
   function addDays(dateStr, diff){
     const dt = new Date(String(dateStr) + 'T00:00:00');
     dt.setDate(dt.getDate() + diff);
@@ -3237,7 +3242,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(companyInput && companyInput.value.trim()) openCompanyModalByName(companyInput.value.trim());
   };
   window.getUnvisitedThisMonth = function(){
-    return getDashboardSites().filter(site => countThisMonth(visitStore[site.name]) === 0 && !DashboardRules.noteDeferral(site.note));
+    return getDashboardSites().filter(site => countThisMonth(visitStore[site.name]) < MONTHLY_TARGET );
   };
   window.getNeverVisited = function(){
     return getDashboardSites().filter(site => site.visits === 0 && (visitStore[site.name] || []).length === 0 );
@@ -3246,7 +3251,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return getDashboardSites().filter(site => site.end && daysUntil(site.end) >= 0 && daysUntil(site.end) <= 30 ).sort((a,b)=>daysUntil(a.end)-daysUntil(b.end));
   };
   window.refreshKPIs = function(){
-    const allSites = dedupeSitesByName(sites).filter(s=>DashboardRules.visible(s));
+    const allSites = dedupeSitesByName(sites);
     document.getElementById('kpi-total').textContent = getDashboardSites().length;
     document.getElementById('kpi-unvisited').textContent = getUnvisitedThisMonth().length;
     document.getElementById('kpi-never').textContent = getNeverVisited().length;
@@ -3295,32 +3300,46 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
   window.renderActivity = function(){
-    const host=document.getElementById('activity-list');if(!host)return;
-    host.replaceChildren();
-    const all=getDashboardSites(), today=DashboardRules.day(new Date());
-    const lastContact=s=>DashboardRules.uniqueDates(contactStore[s.name]).slice(-1)[0]||'';
-    const sections=[
-      {title:'비고(노트) 있는 공사',items:all.filter(s=>String(s.note||'').trim()),color:'#dc2626'},
-      {title:'연락 지연 (14일+) · 미등록 포함',items:all.filter(s=>{const d=lastContact(s);return !d||(Date.parse(today)-Date.parse(d))/86400000>=14;}),color:'#b45309'},
-      {title:'공사중지',items:all.filter(s=>String(s.status||'').replace(/\s+/g,'')==='공사중지'),color:'#475569'},
-      {title:'새로 만들기',items:all.filter(s=>String(s.status||'').replace(/\s+/g,'')==='새로만들기'),color:'#0284c7'}
+    const activityList = document.getElementById('activity-list');
+    if(!activityList) return;
+    activityList.innerHTML = '';
+    const all = getDashboardSites();
+    const noteSites = all.filter(s=>s.note).slice(0,3);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const overdueSites = all.filter(s=>{
+      const arr = (typeof contactStore!=='undefined' && contactStore && contactStore[s.name]) || [];
+      if(!arr.length) return true;
+      const latest = new Date(String(arr.slice().sort()[arr.length-1])+'T00:00:00');
+      const diff = Math.floor((today - latest) / (1000*60*60*24));
+      return diff >= 14;
+    }).slice(0,3);
+    const stoppedSites = all.filter(s=>String(s.status||'').replace(/\s+/g,'').includes('공사중지')).slice(0,3);
+    const newSites = all.filter(s=>String(s.status||'').replace(/\s+/g,'').includes('새로만들기') || String(s.status||'').replace(/\s+/g,'').includes('새로 만들기')).slice(0,3);
+    const sections = [
+      { title:'🚨 비고(노트) 있는 공사', items:noteSites, color:'#ef4444' },
+      { title:'📞 연락 지연 (14일+)', items:overdueSites, color:'#f59e0b' },
+      { title:'⏸ 공사중지', items:stoppedSites, color:'#64748b' },
+      { title:'🆕 새로 만들기', items:newSites, color:'#0ea5e9' }
     ];
-    function openAll(section){
-      let overlay=document.getElementById('activity-all-modal');
-      if(!overlay){overlay=document.createElement('div');overlay.id='activity-all-modal';overlay.className='modal-overlay';overlay.innerHTML='<div class="modal-box"><button type="button" class="modal-close" aria-label="닫기">×</button><h3></h3><input class="search-box" aria-label="공사 검색" placeholder="공사명·회사·비고 검색"><p class="activity-all-count"></p><div class="activity-all-body"></div></div>';document.body.appendChild(overlay);overlay.addEventListener('click',e=>{if(e.target===overlay||e.target.closest('.modal-close'))overlay.classList.remove('active');});}
-      overlay.querySelector('h3').textContent=section.title+' · '+section.items.length+'건';
-      const input=overlay.querySelector('input'),body=overlay.querySelector('.activity-all-body');input.value='';
-      const render=()=>{const q=input.value.trim().toLowerCase();const list=section.items.filter(s=>[s.name,s.company,s.note,s.site].join(' ').toLowerCase().includes(q));body.replaceChildren();overlay.querySelector('.activity-all-count').textContent='표시 '+list.length+' / 전체 '+section.items.length+'건';
-        list.forEach(s=>{const button=document.createElement('button');button.type='button';button.className='kpi-list-row activity-full-row';const title=document.createElement('strong');title.textContent=s.name;const meta=document.createElement('span');meta.textContent=[s.company,s.site,s.status,'최근 연락요청: '+(lastContact(s)||'미등록'),s.note||''].join(' · ');button.append(title,meta);button.onclick=()=>openDetailByName(s.name);body.appendChild(button);});
-      };input.oninput=render;render();showModalFront(overlay);
-    }
-    sections.forEach(section=>{
-      const head=document.createElement('div');head.className='activity-section-head';head.style.color=section.color;
-      const label=document.createElement('span');label.textContent=section.title+' ('+section.items.length+')';
-      const more=document.createElement('button');more.type='button';more.textContent='+더보기';more.onclick=()=>openAll(section);head.append(label,more);host.appendChild(head);
-      section.items.slice(0,3).forEach(s=>{const item=document.createElement('button');item.type='button';item.className='activity-item activity-preview';item.textContent=s.name+' · '+(s.company||'-');item.title=s.note||s.status||'';item.onclick=()=>openDetailByName(s.name);host.appendChild(item);});
-      if(!section.items.length){const empty=document.createElement('small');empty.textContent='해당 항목 없음';host.appendChild(empty);}
+    let rendered = 0;
+    sections.forEach(sec=>{
+      if(!sec.items.length) return;
+      const h = document.createElement('div');
+      h.style.cssText='font-size:12px;font-weight:800;color:'+sec.color+';margin-top:'+(rendered?'10px':'2px')+';margin-bottom:4px;';
+      h.textContent = sec.title;
+      activityList.appendChild(h);
+      sec.items.forEach(site=>{
+        const div = document.createElement('div');
+        div.className='activity-item';
+        div.style.cursor='pointer';
+        div.onclick = ()=>openDetailByName(site.name);
+        const sub = site.company || '-';
+        div.innerHTML = '<span><span class="dot" style="background:'+siteColor(site.name)+'"></span>'+escapeHtml(site.name)+noteFlag(site)+' · '+escapeHtml(sub)+'</span><span style="color:'+sec.color+';font-weight:700;">'+escapeHtml(site.status||'')+'</span>';
+        activityList.appendChild(div);
+        rendered++;
+      });
     });
+    if(!rendered) activityList.innerHTML = '<div style="color:#94a3b8;font-size:13px;">긴급 확인 항목 없음</div>';
   };
   window.generateWeekSchedule = function(){
     const weekDays = ['일','월','화','수','목','금','토'];
@@ -3353,19 +3372,69 @@ document.addEventListener('DOMContentLoaded', () => {
     return { weekDays, plan };
   };
   window.renderAIWeek = function(){
- const grid=document.getElementById('ai-week-grid');if(!grid)return;
- grid.replaceChildren();const days=DashboardRules.week(sites),labels=['월','화','수','목','금','토','일'];
- const panel=grid.closest('.ai-schedule-panel'),hint=panel&&panel.querySelector('.cal-hint');
- if(hint)hint.textContent='노션에 등록된 방문일자 그대로 · 월~일 · '+days[0].date+' ~ '+days[6].date+' · 총 '+days.reduce((n,d)=>n+d.items.length,0)+'건 (시간 미등록 시 공사명순)';
- days.forEach((d,i)=>{const cell=document.createElement('div');cell.className='ai-day';
- const head=document.createElement('div');head.className='d-label';head.textContent=labels[i]+' '+d.date.slice(5).replace('-','/')+' · '+d.items.length+'건';cell.appendChild(head);
- d.items.forEach(site=>{const chip=document.createElement('button');chip.type='button';chip.className='ai-visit-chip chip-normal';chip.textContent=site.name+'\n'+(site.company||'-')+' · '+(site.site||'');chip.title=site.note||site.name;chip.onclick=()=>openDetailByName(site.name);cell.appendChild(chip);});
- if(!d.items.length){const empty=document.createElement('small');empty.textContent='등록 일정 없음';cell.appendChild(empty);}grid.appendChild(cell);
- });
-};
+    const grid = document.getElementById('ai-week-grid');
+    if(!grid) return;
+    grid.innerHTML = '';
+    const weekDays = ['일','월','화','수','목','금','토'];
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dayOfWeek = today.getDay();
+    const mondayOffset = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
+    const weekStart = new Date(today); weekStart.setDate(today.getDate() + mondayOffset);
+    const fmt = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const weekStartStr = fmt(weekStart);
+    const dayMap = {};
+    for(let i=0;i<7;i++){
+      const d = new Date(weekStart); d.setDate(weekStart.getDate()+i);
+      dayMap[fmt(d)] = { label: weekDays[d.getDay()], items: [] };
+    }
+    const sitesArr = (typeof dedupeSitesByName==='function' ? dedupeSitesByName(window.sites||[]) : (window.sites||[]));
+    sitesArr.forEach(site=>{
+      const fromStore = (typeof visitStore!=='undefined' ? (visitStore[site.name]||[]) : []);
+      const fromSite = (site.visitDates && site.visitDates.length) ? site.visitDates : [];
+      const merged = Array.from(new Set([...fromStore, ...fromSite]));
+      merged.forEach(d=>{
+        const ds = String(d).slice(0,10);
+        if(dayMap[ds]) dayMap[ds].items.push(site);
+      });
+    });
+    for(let i=0;i<7;i++){
+      const d = new Date(weekStart); d.setDate(weekStart.getDate()+i);
+      const ds = fmt(d);
+      const cell = document.createElement('div');
+      cell.className = 'ai-day';
+      const head = document.createElement('div');
+      head.className = 'd-label';
+      head.textContent = dayMap[ds].label + ' ('+String(d.getMonth()+1)+'/'+String(d.getDate())+')';
+      cell.appendChild(head);
+      if(dayMap[ds].items.length){
+        dayMap[ds].items.forEach(site=>{
+          const chip = document.createElement('div');
+          chip.className = 'ai-visit-chip chip-normal';
+          chip.style.cursor = 'pointer';
+          chip.textContent = site.name;
+          chip.title = site.name + ' · ' + (site.company||'-');
+          chip.addEventListener('click',()=>openDetailByName(site.name));
+          if(site.note){ const flag = document.createElement('span'); flag.className='note-flag'; flag.style.width='14px'; flag.style.height='14px'; flag.style.fontSize='10px'; flag.textContent='!'; chip.appendChild(flag); }
+          cell.appendChild(chip);
+        });
+      } else {
+        const empty = document.createElement('div');
+        empty.style.cssText='font-size:11px;color:#94a3b8;';
+        empty.textContent='일정 없음';
+        cell.appendChild(empty);
+      }
+      grid.appendChild(cell);
+    }
+    const anyItem = Object.keys(dayMap).some(k => dayMap[k].items.length);
+    if(!anyItem){
+      const note = document.createElement('div');
+      note.style.cssText = 'grid-column:1/-1;font-size:12px;color:#94a3b8;padding:8px;';
+      note.textContent = '이번 주 노션 방문일정이 없습니다. (Notion 동기화 후 방문일자 데이터가 표시됩니다)';
+      grid.appendChild(note);
+    }
+
+  };
   window.renderDashboard = function(){
-    const visible=sites.filter(s=>DashboardRules.visible(s));
-    if(visible.length!==sites.length){sites=visible;rebuildStoresFromSites();}
     refreshKPIs();
     renderCompletionList();
     renderRegion();
@@ -3435,9 +3504,9 @@ document.addEventListener('DOMContentLoaded', () => {
       subtitle = '연락요청 일정도 없고 비고도 없는 진행중 공사만 모았습니다. 회사명을 누르면 해당 공사 목록이 열립니다.';
     } else if(kind === 'completed-month'){
       const arr = getMonthlyCompletedSites();
-      list = arr.map(site => ({ name: site.name, sub: (site.company||'-') + ' · 완료체크 ' + (DashboardRules.day(site.lastEdited) || '-'), region: site.site || site.region || '', site: site.site || site.region || '' }));
+      list = arr.map(site => ({ name: site.name, sub: (site.company||'-') + ' · 최종 편집 ' + (completionDayKST(site.lastEdited) || '날짜 미확인'), region: site.site || site.region || '', site: site.site || site.region || '' }));
       title = '이번달 공사완료 · ' + arr.length + '건';
-      subtitle = '최신 행의 작업 여부=공사완료, 최종 편집 월=이번달. 실제 완료 변경 시각이 아닌 최종 편집 기준입니다.';
+      subtitle = '최신 상태가 공사완료이고 최종 편집 월이 이번달인 공사입니다. 표시 날짜는 실제 완료 체크일이 아닌 최종 편집일입니다.';
     }
     kpiListData = list;
     document.getElementById('kpi-list-title').textContent = title;
@@ -4770,8 +4839,7 @@ if (typeof window.bringModalToFront === 'function') {
   }, true);
 }
 
-let dashboardMonthKey=DashboardRules.month(new Date());
-setInterval(()=>{const month=DashboardRules.month(new Date());if(month!==dashboardMonthKey){dashboardMonthKey=month;sites=sites.filter(s=>DashboardRules.visible(s));initAllViews();loadFromNotion();}},60000);
-document.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('activity-all-modal')?.classList.remove('active');});
+let completionDisplayMonth=completionMonthKST(new Date());
+setInterval(()=>{const m=completionMonthKST(new Date());if(m!==completionDisplayMonth){completionDisplayMonth=m;sites=sites.filter(s=>isSiteVisibleByCompletion(s));initAllViews();loadFromNotion();}},60000);
 </script></body>
 </html>
