@@ -975,6 +975,45 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 
 <script>
 
+// Conservative, rule-based memo exclusion. Ambiguous notes remain visible.
+function futureWorkMemoReason(site,at=new Date()){
+ const text=String(site&&site.note||'').normalize('NFKC').replace(/\u00a0/g,' ');
+ const today=completionDayKST(at),year=Number(today.slice(0,4)),month=Number(today.slice(5,7));
+ if(!text.trim())return '';
+ const action=/(?:작업|착수|착공|시작|재개|진행)/;
+ const planned=/(?:예정|계획|시작|재개|착수|작업|진행)/;
+ const clauses=text.split(/[\n.;。]/);
+ const candidates=[];
+ for(const clause of clauses){
+   const dates=[...clause.matchAll(/(?:(20\d{2}|\d{2})년(?:도)?\s*)?(\d{1,2})(?:월(?:\s*\d{1,2}일)?|\/(\d{1,2}))/g)];
+   const relevant=dates.map(d=>{
+     let y=d[1]?Number(d[1]):year;if(y<100)y+=2000;
+     const m=Number(d[2]),n=d.index,tail=clause.slice(n+d[0].length,n+d[0].length+45),before=clause.slice(Math.max(0,n-8),n);
+     const work=action.test(tail)||/작업\s*$/.test(before);
+     const excludedContext=/^(?:\s*(?:초|중순|말|중|에|부터|\d{1,2}일))*\s*(?:준공|완료)/.test(tail)||/^\s*추가\s*작업/.test(tail);
+     return {y,m,work:work&&!excludedContext,raw:d[0]};
+   }).filter(d=>d.m>=1&&d.m<=12);
+   if(relevant.some(d=>d.y===year&&d.m===month&&d.work))return '';
+   for(const d of relevant){if(d.work&&(d.y>year||(d.y===year&&d.m>month)))candidates.push('작업 예정 '+d.y+'-'+String(d.m).padStart(2,'0'));}
+   for(const d of clause.matchAll(/(20\d{2}|\d{2})년(?:도)?/g)){
+     const y=Number(d[1])<100?2000+Number(d[1]):Number(d[1]);
+     const tail=clause.slice(d.index+d[0].length,d.index+d[0].length+40);
+     if(y>year&&action.test(tail)&&/예정|계획|일정/.test(tail))candidates.push(y+'년 작업 예정');
+   }
+   if(/다음\s*달|다음\s*월/.test(clause)&&action.test(clause)&&planned.test(clause)){
+     const anchor=completionDayKST(site.lastEdited);if(anchor){const y=Number(anchor.slice(0,4)),m=Number(anchor.slice(5,7));const target=y*12+m;if(target>year*12+month-1)candidates.push('메모 편집월 기준 다음달 작업');}
+   }
+ }
+ return candidates[0]||'';
+}
+function isUnvisitedCandidateForMonth(site,dates,at=new Date()){
+ if(isLatestStatusCompleted(site))return false;
+ const month=completionMonthKST(at);
+ const count=(dates||[]).filter(d=>completionDayKST(d).slice(0,7)===month).length;
+ return count===0&&!futureWorkMemoReason(site,at);
+}
+
+
 // Completion reporting follows latest representative status and edit MONTH, not planned end date.
 function completionDayKST(value){
   if(!value)return '';
@@ -3242,7 +3281,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(companyInput && companyInput.value.trim()) openCompanyModalByName(companyInput.value.trim());
   };
   window.getUnvisitedThisMonth = function(){
-    return getDashboardSites().filter(site => countThisMonth(visitStore[site.name]) < MONTHLY_TARGET );
+    return getDashboardSites().filter(site => isUnvisitedCandidateForMonth(site, visitStore[site.name] || []));
   };
   window.getNeverVisited = function(){
     return getDashboardSites().filter(site => site.visits === 0 && (visitStore[site.name] || []).length === 0 );
@@ -4841,5 +4880,8 @@ if (typeof window.bringModalToFront === 'function') {
 
 let completionDisplayMonth=completionMonthKST(new Date());
 setInterval(()=>{const m=completionMonthKST(new Date());if(m!==completionDisplayMonth){completionDisplayMonth=m;sites=sites.filter(s=>isSiteVisibleByCompletion(s));initAllViews();loadFromNotion();}},60000);
+
+const unvisitedKpiElement=document.getElementById('kpi-unvisited');
+if(unvisitedKpiElement)unvisitedKpiElement.closest('.kpi').title='이번달 방문일자 0회 · 완료 현장 및 명확한 향후 작업 메모 제외';
 </script></body>
 </html>
