@@ -570,7 +570,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
         <div class="kpi kpi-green" onclick="openKpiList('monthly-visits')"><div class="label">이번달 총 방문횟수</div><div class="value" id="kpi-monthly-visits">-</div></div>
         <div class="kpi kpi-purple" onclick="openKpiList('completion')"><div class="label">준공 임박(30일)</div><div class="value" id="kpi-completion">-</div></div>
         <div class="kpi kpi-amber" onclick="openKpiList('contact-missing')"><div class="label">연락요청·비고 없음</div><div class="value" id="kpi-contact-missing">-</div></div>
-        <div class="kpi kpi-slate" onclick="openKpiList('completed-month')"><div class="label">전체 공사완료</div><div class="value" id="kpi-completed-month">-</div></div>
+        <div class="kpi kpi-slate" onclick="openKpiList('completed-month')"><div class="label">이번달 공사완료</div><div class="value" id="kpi-completed-month">-</div></div>
       </div>
       <div class="dash-two-col">
         <div class="panel dash-scroll">
@@ -974,6 +974,24 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
 
 
 <script>
+
+// Completion reporting follows latest representative status and edit MONTH, not planned end date.
+function completionDayKST(value){
+  if(!value)return '';
+  const text=String(value);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(text))return text;
+  const date=new Date(value);
+  return Number.isNaN(date.getTime())?'':new Date(date.getTime()+9*3600000).toISOString().slice(0,10);
+}
+function completionMonthKST(value){ return completionDayKST(value).slice(0,7); }
+function isLatestStatusCompleted(site){ return String(site&&site.status||'').replace(/\s+/g,'')==='공사완료'; }
+function isThisMonthCompleted(site,at=new Date()){
+  return isLatestStatusCompleted(site)&&completionMonthKST(site.lastEdited)===completionMonthKST(at);
+}
+function isSiteVisibleByCompletion(site,at=new Date()){
+  return !isLatestStatusCompleted(site)||isThisMonthCompleted(site,at);
+}
+
 function getHolidayName(year, month, day) {
     const m = month + 1;
     const fixed = {'1-1':'신정','3-1':'삼일절','5-5':'어린이날','6-6':'현충일','8-15':'광복절','10-3':'개천절','10-9':'한글날','12-25':'크리스마스'};
@@ -1633,7 +1651,12 @@ function sendChat(){ const input=document.getElementById('chat-input'); const te
 
 const API_BASE="";
 function normalizeSite(s){ return { name:s.name||"이름없음", company:s.company||"", visits:(s.visitDates&&s.visitDates.length)||s.visits||0, targetVisits:s.targetVisits||s.visits||2, lastVisit:s.lastVisit||null, visitDates:s.visitDates||(s.lastVisit?[s.lastVisit]:[]), contactDates:s.contactDates||(s.contactRequest?[s.contactRequest]:[]), contact:s.contact||"", managerName:s.managerName||s.manager||"", address:s.address||"", start:s.start||null, end:s.end||null, contractDate:s.contractDate||null, amount:s.amount||0, contactRequest:s.contactRequest||null, status:s.status||"", note:s.note||"", bizOpenNo:s.bizOpenNo||"", bizMgmtNo:s.bizMgmtNo||"", mgmtNo:s.mgmtNo||"", site:s.site||s.region||(s.address||'').split(' ')[0]||'기타', lastEdited:s.lastEdited||new Date().toISOString(), createdAt:s.createdAt||s['생성 일시']||s.lastEdited||new Date().toISOString(), notionId:s.id||(s.pageIds&&s.pageIds[0])||null, pageDetails:s.pageDetails||[], pageIds:s.pageIds||(s.id?[s.id]:[]), visitHistoryPageId:s.visitHistoryPageId||s.id||null, contactHistoryPageId:s.contactHistoryPageId||s.id||null, rawProperties:s.rawProperties||{}, photoUrls:Array.isArray(s.photoUrls)?s.photoUrls:[] }; }
-function rebuildStoresFromSites(){ sites.forEach(s=>{ visitStore[s.name]=Array.isArray(s.visitDates)?s.visitDates.slice():(visitStore[s.name]||[]); contactStore[s.name]=Array.isArray(s.contactDates)?s.contactDates.slice():(contactStore[s.name]||[]); }); saveStore(STORE_KEY,visitStore); saveStore(CONTACT_KEY,contactStore); }
+function rebuildStoresFromSites(){
+ visitStore={};contactStore={};
+ sites.forEach(s=>{visitStore[s.name]=Array.isArray(s.visitDates)?s.visitDates.slice():[];contactStore[s.name]=Array.isArray(s.contactDates)?s.contactDates.slice():[];});
+ saveStore(STORE_KEY,visitStore);saveStore(CONTACT_KEY,contactStore);
+}
+
 
 async function syncFromNotion(){ await loadFromNotion(); }
 
@@ -2251,13 +2274,14 @@ function openDetailByName(name){
 }
 async function loadFromNotion(){
   try{
-    const res=await fetch(API_BASE + '/api/contracts');
+    const res=await fetch(API_BASE + '/api/contracts', {cache:'no-store'});
     const data=await res.json();
-    if(data.ok && data.sites && data.sites.length){
-      sites = data.sites.map(normalizeSite);
-    }
+    if(!res.ok || !data.ok || !Array.isArray(data.sites)) throw new Error(data.error || 'Notion 조회 실패');
+    sites = data.sites.filter(s=>isSiteVisibleByCompletion(s)).map(normalizeSite);
   }catch(e){
     console.error('loadFromNotion error:', e);
+    showSyncBanner('Notion 동기화 실패 — 최신 데이터가 아닐 수 있습니다: '+e.message, '#dc2626');
+    return;
   }
   initAllViews();
   await loadCompanies();
@@ -3003,42 +3027,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const COMPLETED_STATUS_KEYWORDS = ['완료','준공완료','공사완료','공사 완료','종료','종결'];
   let currentDetailSiteName = null;
   let calendarAddState = { storeType: 'visit', dateStr: '', query: '' };
-  function isCompletedSite(site){
-    if(!site) return false;
-    if(site.__completed === true) return true;
-    const status = String((site.status) || '').replace(/\s+/g,'');
-    if(COMPLETED_STATUS_KEYWORDS.some(keyword => status.includes(String(keyword).replace(/\s+/g,'')))) return true;
-    const props = site.rawProperties || {};
-    for(const cand of ['공사완료','공사 완료','완료','completed']){
-      const key = Object.keys(props).find(k => k.replace(/\s+/g,'').toLowerCase().includes(String(cand).replace(/\s+/g,'').toLowerCase()));
-      if(!key) continue;
-      if(/입력|전송|업로드/.test(key)) continue;
-      const px = props[key];
-      if(!px) continue;
-      if(px.type === 'checkbox' && px.checkbox === true) return true;
-      if(px.type === 'status' || px.type === 'select'){
-        const v = (px.status && px.status.name) || (px.select && px.select.name) || '';
-        if(COMPLETED_STATUS_KEYWORDS.some(k => String(v).replace(/\s+/g,'').includes(k))) return true;
-      }
-      if(px.type === 'rich_text' || px.type === 'title'){
-        const txt = (px.rich_text || px.title || []).map(t => (t && t.plain_text) || '').join('').replace(/\s+/g,'');
-        if(COMPLETED_STATUS_KEYWORDS.some(k => txt.includes(k))) return true;
-      }
-    }
-    return false;
-  }
+  function isCompletedSite(site){return isLatestStatusCompleted(site);}
   function getDashboardSites(){
     return dedupeSitesByName(Array.isArray(sites) ? sites : []).filter(site => !isCompletedSite(site));
   }
-  function getMonthlyCompletedSites(){
-    return dedupeSitesByName(Array.isArray(sites) ? sites : []).filter(site => {
-      if(!isCompletedSite(site)) return false;
-      const ref = site.completedAt || site.end;
-      if(!ref) return false;
-      const dt = new Date(ref);
-      return dt.getFullYear() === curYear && dt.getMonth() === curMonth;
-    });
-  }
+  function getMonthlyCompletedSites(){return dedupeSitesByName(sites).filter(site=>isThisMonthCompleted(site));}
   function addDays(dateStr, diff){
     const dt = new Date(String(dateStr) + 'T00:00:00');
     dt.setDate(dt.getDate() + diff);
@@ -3511,9 +3504,9 @@ document.addEventListener('DOMContentLoaded', () => {
       subtitle = '연락요청 일정도 없고 비고도 없는 진행중 공사만 모았습니다. 회사명을 누르면 해당 공사 목록이 열립니다.';
     } else if(kind === 'completed-month'){
       const arr = getMonthlyCompletedSites();
-      list = arr.map(site => ({ name: site.name, sub: (site.company||'-') + ' · 완료체크 ' + (site.completedAt || site.end || '-'), region: site.site || site.region || '', site: site.site || site.region || '' }));
+      list = arr.map(site => ({ name: site.name, sub: (site.company||'-') + ' · 최종 편집 ' + (completionDayKST(site.lastEdited) || '날짜 미확인'), region: site.site || site.region || '', site: site.site || site.region || '' }));
       title = '이번달 공사완료 · ' + arr.length + '건';
-      subtitle = '이번달에 공사완료 처리된 공사 목록(준공일 기준). 지역 검색 가능.';
+      subtitle = '최신 상태가 공사완료이고 최종 편집 월이 이번달인 공사입니다. 표시 날짜는 실제 완료 체크일이 아닌 최종 편집일입니다.';
     }
     kpiListData = list;
     document.getElementById('kpi-list-title').textContent = title;
@@ -4845,5 +4838,8 @@ if (typeof window.bringModalToFront === 'function') {
     }catch(e){}
   }, true);
 }
+
+let completionDisplayMonth=completionMonthKST(new Date());
+setInterval(()=>{const m=completionMonthKST(new Date());if(m!==completionDisplayMonth){completionDisplayMonth=m;sites=sites.filter(s=>isSiteVisibleByCompletion(s));initAllViews();loadFromNotion();}},60000);
 </script></body>
 </html>

@@ -4,6 +4,24 @@ const cors = require('cors');
 const path = require('path');
 const { Client } = require('@notionhq/client');
 
+
+// Completion reporting follows latest representative status and edit MONTH, not planned end date.
+function completionDayKST(value){
+  if(!value)return '';
+  const text=String(value);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(text))return text;
+  const date=new Date(value);
+  return Number.isNaN(date.getTime())?'':new Date(date.getTime()+9*3600000).toISOString().slice(0,10);
+}
+function completionMonthKST(value){ return completionDayKST(value).slice(0,7); }
+function isLatestStatusCompleted(site){ return String(site&&site.status||'').replace(/\s+/g,'')==='공사완료'; }
+function isThisMonthCompleted(site,at=new Date()){
+  return isLatestStatusCompleted(site)&&completionMonthKST(site.lastEdited)===completionMonthKST(at);
+}
+function isSiteVisibleByCompletion(site,at=new Date()){
+  return !isLatestStatusCompleted(site)||isThisMonthCompleted(site,at);
+}
+
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
@@ -178,7 +196,7 @@ function pageToSite(page) {
   const p = page.properties || {};
   const managerEntries = extractPeopleFromProperties(p);
   const statusVal = getPropertyStatus(p, ['작업 여부', '상태']);
-  const completedFlag = isPageCompleted(page) || isCompletedByStatusValue(statusVal);
+  const completedFlag = isLatestStatusCompleted({status:statusVal});
   return {
     id: page.id,
     name: getPropertyString(p, ['공사명', '현장명']) || '이름없음',
@@ -394,13 +412,16 @@ async function updateCompanyPages(companyName, payload) {
 }
 
 app.get('/api/contracts', async (req, res) => {
+  res.set('Cache-Control','no-store');
   try {
     if (!DB_ID) throw new Error('NOTION_DATABASE_ID not set');
     const results = await queryAllPages(DB_ID);
     const rawSites = results.map(pageToSite);
     const completedNames = buildCompletedSiteNameSet(rawSites);
-    const sites = groupSites(rawSites);
-    const excluded = 0;
+    const groupedSites = groupSites(rawSites);
+    const sites = groupedSites.filter(s=>isSiteVisibleByCompletion(s));
+    const visibleNames = new Set(sites.map(s=>s.name));
+    const excluded = rawSites.filter(s=>!visibleNames.has(s.name)).length;
     res.json({ ok: true, count: sites.length, rawCount: rawSites.length, excludedByCompletion: excluded, completedSiteNames: Array.from(completedNames), sites });
   } catch (err) {
     console.error('contracts error:', err);
@@ -414,7 +435,8 @@ app.get('/api/companies', async (req, res) => {
     const contractPages = await queryAllPages(DB_ID);
     const rawSites = contractPages.map(pageToSite);
     const companyPages = COMPANY_DB_ID ? await queryAllPages(COMPANY_DB_ID) : [];
-    const companies = buildCompaniesV2(rawSites, companyPages);
+    const visibleNames = new Set(groupSites(rawSites).filter(s=>isSiteVisibleByCompletion(s)).map(s=>s.name));
+    const companies = buildCompaniesV2(rawSites.filter(s=>visibleNames.has(s.name)), companyPages).filter(c=>(c.contracts||[]).length>0);
     res.json({ ok: true, count: companies.length, companies, companyDbEnabled: Boolean(COMPANY_DB_ID) });
   } catch (err) {
     console.error('companies error:', err);
