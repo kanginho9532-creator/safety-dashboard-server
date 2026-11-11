@@ -1,0 +1,41 @@
+name: Bind dashboard HTTP server explicitly to IPv4
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/explicit-ipv4-listen-20261111.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch listen host and test local HTTP socket
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,subprocess,tempfile
+          p=Path('app/index.js');s=p.read_text();b=s.encode()
+          assert hashlib.sha1(b'blob '+str(len(b)).encode()+bytes([0])+b).hexdigest()=='273a1ffda6393bab88cce3bcaa8a396d46adc355','Server changed; stop for review'
+          old='app.listen(PORT, () => console.log(`Server running on ${PORT}`));'
+          new="const httpServer = app.listen(Number(PORT), '0.0.0.0', () => { console.log('HTTP listening', JSON.stringify(httpServer.address())); }); httpServer.once('error', error => { console.error('HTTP listen error', error); process.exit(1); });"
+          assert s.count(old)==1 and 'const httpServer =' not in s,'Listen block changed'
+          s=s.replace(old,new,1)
+          test="const http = require('http'); const assert = require('assert'); const app = http.createServer((req,res)=>{res.end('ok');}); const PORT=0;"+chr(10)+new+chr(10)+"httpServer.once('listening',()=>{const a=httpServer.address();assert.equal(a.address,'0.0.0.0');assert.equal(a.family,'IPv4');http.get({host:'127.0.0.1',port:a.port,path:'/'},res=>{assert.equal(res.statusCode,200);let body='';res.on('data',d=>body+=d);res.on('end',()=>{assert.equal(body,'ok');httpServer.close(()=>console.log('IPv4 binding and HTTP request test passed'));});}).on('error',e=>{console.error(e);process.exit(1);});});"
+          with tempfile.TemporaryDirectory() as td:
+              f=Path(td)/'server.js';f.write_text(s);subprocess.run(['node','--check',str(f)],check=True)
+              f=Path(td)/'socket-test.js';f.write_text(test);subprocess.run(['node',str(f)],check=True,timeout=10)
+          p.write_text(s)
+          print('Validated explicit IPv4 binding; only listen block changed')
+          PY
+      - name: Commit verified server only
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/index.js
+          git diff --cached --check
+          git commit -m "Bind dashboard server to 0.0.0.0 and log actual listening address"
+          git push origin HEAD:main
