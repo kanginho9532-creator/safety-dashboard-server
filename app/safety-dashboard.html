@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>안전관리 통합 대시보드</title>
-<meta name="dashboard-build" content="completion-date-policy-20261111">
+<meta name="dashboard-build" content="detail-contract-layout-20261111">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2563eb">
 <style>
@@ -828,22 +828,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:1
       <div class="lbl" id="detail-visit-history-title">방문이력 (총 0회)</div>
       <div id="detail-visit-history-list" class="visit-history-list"></div>
     </div>
-    <div class="detail-normal-row">
-      <div class="item"><div class="lbl">계약일</div><div id="detail-contract-date">-</div></div>
-      <div class="item"><div class="lbl">착공일</div><div id="detail-start-date">-</div></div>
-    </div>
-    <div class="detail-normal-row">
-      <div class="item"><div class="lbl">준공일</div><div id="detail-end-date">-</div></div>
-      <div class="item"><div class="lbl">기술지도 계약금액(VAT포함)</div><div id="detail-amount">-</div></div>
-    </div>
-    <div class="detail-normal-row">
-      <div class="item"><div class="lbl">사이트</div><div id="detail-site">-</div></div>
-      <div class="item"><div class="lbl">관리번호</div><div id="detail-mgmt-no">-</div></div>
-    </div>
-    <div class="detail-normal-row">
-      <div class="item"><div class="lbl">사업장개시번호</div><div id="detail-biz-open-no">-</div></div>
-      <div class="item"><div class="lbl">사업장관리번호</div><div id="detail-biz-mgmt-no">-</div></div>
-    </div>
+    <div class="detail-normal-row detail-contract-fields" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;"><div class="item"><div class="lbl">계약일</div><div id="detail-contract-date">-</div></div><div class="item"><div class="lbl">완료처리일</div><div id="detail-completion-date">-</div></div><div class="item"><div class="lbl">착공일</div><div id="detail-start-date">-</div></div><div class="item"><div class="lbl">준공일</div><div id="detail-end-date">-</div></div><div class="item"><div class="lbl">관리번호</div><div id="detail-mgmt-no">-</div></div><div class="item"><div class="lbl">기술지도 계약금액(VAT포함)</div><div id="detail-amount">-</div></div><div class="item"><div class="lbl">사업장관리번호</div><div id="detail-biz-mgmt-no">-</div></div><div class="item"><div class="lbl">사업장개시번호</div><div id="detail-biz-open-no">-</div></div></div><div class="item" style="display:none;"><div id="detail-site">-</div></div>
     <div id="detail-company" style="display:none;"></div>
     </div>
   </div>
@@ -4667,7 +4652,7 @@ window.renderScheduleBoard = function(){
   }catch(e){ console.error('renderScheduleBoard', e); if(typeof originalRenderScheduleBoard==='function') originalRenderScheduleBoard(); }
 };
 
-function renderDetailCategoryBlock(site){
+function renderDetailCategoryBlock(site){const completion=document.getElementById('detail-completion-date');if(completion)completion.textContent=completionDayKST(site.completedAt)||'미입력';
   const shell = document.querySelector('#detail-modal .detail-scroll-shell');
   if(!shell) return;
   let wrap = document.getElementById('detail-category-row');
