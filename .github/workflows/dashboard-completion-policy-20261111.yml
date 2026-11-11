@@ -1,0 +1,108 @@
+name: Apply reviewed dashboard policy
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/dashboard-completion-policy-20261111.yml']
+permissions:
+  contents: write
+concurrency:
+  group: dashboard-completion-policy-20261111
+  cancel-in-progress: false
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch and validate before committing
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,re,subprocess,tempfile
+          S=Path('app/index.js');H=Path('app/safety-dashboard.html')
+          s=S.read_text();h=H.read_text()
+          def blob(t):
+              b=t.encode();return hashlib.sha1(b'blob '+str(len(b)).encode()+bytes([0])+b).hexdigest()
+          assert blob(s)=='a0ed61dc901bcbf3d1cce1c88b31a70d08a802f7','Server changed; stop'
+          assert blob(h)=='8c64e2d9b845941e2ed6856c3cfe3e86d6806ac5','HTML changed; stop'
+          def one(t,a,b):
+              assert t.count(a)==1,(a[:100],t.count(a))
+              return t.replace(a,b,1)
+          def rx(t,p,v):
+              t,n=re.subn(p,lambda m:v,t,flags=re.M);assert n==1,(p,n);return t
+          C=r'''function completionDayKST(v){if(!v)return '';const t=String(v);if(/^\d{4}-\d{2}-\d{2}$/.test(t))return t;const d=new Date(v);return Number.isNaN(d.getTime())?'':new Date(d.getTime()+9*3600000).toISOString().slice(0,10);}
+          function completionMonthKST(v){return completionDayKST(v).slice(0,7);}
+          function isLatestStatusCompleted(s){return String(s&&s.status||'').replace(/\s+/g,'')==='공사완료';}
+          function isThisMonthCompleted(s,at=new Date()){const d=completionDayKST(s&&s.completedAt);return isLatestStatusCompleted(s)&&!!d&&Number.isFinite(Date.parse(d))&&d.slice(0,7)===completionMonthKST(at)&&d<=completionDayKST(at);}
+          function isSiteVisibleByCompletion(s,at=new Date()){return !isLatestStatusCompleted(s)||isThisMonthCompleted(s,at);}
+          function isCompletionDateReview(s,at=new Date()){const d=completionDayKST(s.completedAt);return isLatestStatusCompleted(s)&&(!d||!Number.isFinite(Date.parse(d))||d>completionDayKST(at));}
+          '''
+          P=r'''function dashboardWorkCategory(s){const p=s&&s.rawProperties&&s.rawProperties['작업관리'];const v=String(s&&s.workManagement||(p&&((p.select&&p.select.name)||(p.status&&p.status.name)))||'').replace(/\s+/g,'');return ({'매일작업':'daily','주간작업':'weekly','월간작업':'monthly','불시작업':'sudden','연락회신작업':'reply'})[v]||'sudden';}
+          function dashboardLatestActivity(s,v,c,at=new Date()){return [...(Array.isArray(v)?v:s.visitDates||[]),...(Array.isArray(c)?c:s.contactDates||[])].map(completionDayKST).filter(d=>d&&d<=completionDayKST(at)).sort().pop()||'';}
+          function dashboardIsOverdue(s,v,c,at=new Date()){const d=dashboardLatestActivity(s,v,c,at);return !d||(Date.parse(completionDayKST(at))-Date.parse(d))/86400000>=14;}
+          function renderCompletionReviewButton(){const host=document.getElementById('kpi-completed-month')?.closest('.kpi');if(!host)return;let b=document.getElementById('completion-review-button');if(!b){b=document.createElement('button');b.type='button';b.id='completion-review-button';host.appendChild(b);}const list=window.dashboardCompletionReviewSites||[];b.textContent='완료처리일 확인 '+list.length+'건';b.style.display=list.length?'inline-block':'none';b.onclick=e=>{e.stopPropagation();let o=document.getElementById('completion-review-modal');if(!o){o=document.createElement('div');o.id='completion-review-modal';o.className='modal-overlay';document.body.appendChild(o);}o.replaceChildren();const box=document.createElement('div');box.className='modal-box';const x=document.createElement('button');x.type='button';x.className='modal-close';x.textContent='×';x.setAttribute('aria-label','닫기');x.onclick=()=>o.classList.remove('active');const title=document.createElement('h3');title.textContent='완료처리일 확인 · '+list.length+'건';const note=document.createElement('p');note.textContent='완료처리일 미입력 또는 미래 날짜입니다. 일반 집계에서는 제외하며 Notion 원본에서 확인합니다.';box.append(x,title,note);list.forEach(s=>{const row=document.createElement('div');row.className='kpi-list-row';const label=document.createElement('span');label.textContent=s.name+' · '+(s.company||'-')+' · 완료처리일 '+(completionDayKST(s.completedAt)||'미입력');row.appendChild(label);const id=String(s.id||'').replace(/-/g,'');if(/^[a-f0-9]{32}$/i.test(id)){const a=document.createElement('a');a.href='https://www.notion.so/'+id;a.target='_blank';a.rel='noopener noreferrer';a.textContent='Notion 원본';row.appendChild(a);}box.appendChild(row);});o.appendChild(box);o.onclick=e=>{if(e.target===o)o.classList.remove('active');};if(typeof showModalFront==='function')showModalFront(o);else o.classList.add('active');};}
+          document.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('completion-review-modal')?.classList.remove('active');});
+          '''
+          a=s.index('function completionDayKST(');b=s.index('const app = express();',a);s=s[:a]+C+'\n'+s[b:]
+          a=h.index('function completionDayKST(');b=h.index('\n</script>',a);old=h[a:b];k=old.index('function isSiteVisibleByCompletion(');k=old.index('\n}',k)+2;h=h[:a]+C+old[k:]+h[b:]
+          s=one(s,'  const managerEntries = extractPeopleFromProperties(p);',"  const managerEntries = [{label:'책임자',name:getPropertyString(p,['책임자']),phone:getPropertyString(p,['책임자 연락처'])}];")
+          s=rx(s,r"^    contact: getPropertyString\(p, \['감독자 연락처'.*?$","    contact: getPropertyString(p,['책임자 연락처']),")
+          s=rx(s,r"^    managerName: getPropertyString\(p, \['감독자'.*?$","    managerName: getPropertyString(p,['책임자']),")
+          s=one(s,"    manager: getPropertyString(p, ['감독자', '담당자']) || '',","    manager: getPropertyString(p,['책임자']),")
+          s=one(s,'    managerEntries,',"    workManagement: getPropertyString(p,['작업관리']) || '불시 작업',\n    completedAt: getPropertyDate(p,['완료처리일']),\n    managerEntries,".replace('\n','
+'))
+          s=one(s,"  managerName: ['담당자1', '담당자', '감독자'],","  managerName: ['책임자'],")
+          s=one(s,"  contact: ['연락처1', '담당자 연락처', '감독자 연락처', '연락처', '전화번호1'],","  contact: ['책임자 연락처'],")
+          s=one(s,'completedSiteNames: Array.from(completedNames), sites','completedSiteNames: groupedSites.filter(isLatestStatusCompleted).map(s=>s.name), excludedSiteNames: groupedSites.filter(s=>!isSiteVisibleByCompletion(s)).map(s=>s.name), completionReviewSites: groupedSites.filter(s=>isCompletionDateReview(s)), sites')
+          s=one(s,"app.get('/api/companies', async (req, res) => {\n  try {".replace('\n','
+'),"app.get('/api/companies', async (req, res) => {\n  res.set('Cache-Control','no-store');\n  try {".replace('\n','
+'))
+          s=one(s,'buildCompaniesV2(rawSites.filter(s=>visibleNames.has(s.name)), companyPages)','buildCompaniesV2(groupSites(rawSites).filter(s=>visibleNames.has(s.name)), companyPages)')
+          h=one(h,'<script>','<script>\n'+P)
+          h=one(h,'return dedupeSitesByName(Array.isArray(sites) ? sites : []).filter(site => !isCompletedSite(site));','return dedupeSitesByName(Array.isArray(sites) ? sites : []).filter(site => isSiteVisibleByCompletion(site));')
+          h=one(h,'status:s.status||"", note:s.note||"",','status:s.status||"", completedAt:s.completedAt||null, workManagement:s.workManagement||"", note:s.note||"",')
+          h=one(h,'lastEdited:s.lastEdited||new Date().toISOString(),','lastEdited:s.lastEdited||"",')
+          h=one(h,'function initAllViews(){ rebuildStoresFromSites();','function initAllViews(){ sites=sites.filter(s=>isSiteVisibleByCompletion(s)); rebuildStoresFromSites();')
+          load='    sites = data.sites.filter(s=>isSiteVisibleByCompletion(s)).map(normalizeSite);'
+          h=one(h,load,load+'\n    window.dashboardExcludedCompletedNames=new Set(data.excludedSiteNames||[]);\n    window.dashboardCompletionReviewSites=data.completionReviewSites||[];\n    renderCompletionReviewButton();')
+          h=one(h,"' · 최종 편집 ' + (completionDayKST(site.lastEdited) || '날짜 미확인')","' · 완료처리일 ' + (completionDayKST(site.completedAt) || '미입력')")
+          h=one(h,'최신 상태가 공사완료이고 최종 편집 월이 이번달인 공사입니다. 표시 날짜는 실제 완료 체크일이 아닌 최종 편집일입니다.','최신 상태가 공사완료이고 완료처리일이 이번달인 계약입니다. 다음 달부터 일반 목록에서 숨기며 Notion 원본은 보존합니다.')
+          h=one(h,"{title:'연락 지연 (14일+) · 미등록 포함',items:all.filter(s=>{const d=lastContact(s);return !d||(Date.parse(today)-Date.parse(d))/86400000>=14;}),color:'#b45309'}","{title:'방문·연락 지연 (14일+) · 모두 미등록 포함',items:all.filter(s=>!isLatestStatusCompleted(s)&&dashboardIsOverdue(s,visitStore[s.name],contactStore[s.name])),color:'#b45309'}")
+          h=one(h,"'최근 연락요청 '+(lastContact(s)||'미등록')","'최근 연락요청 '+(lastContact(s)||'미등록'),'최근 방문·연락 '+(dashboardLatestActivity(s,visitStore[s.name],contactStore[s.name])||'모두 미등록')")
+          h=one(h,'const active=getDashboardSites();','const active=getDashboardSites().filter(s=>!isLatestStatusCompleted(s));')
+          a=h.index('const originalRenderScheduleBoard = window.renderScheduleBoard;');b=h.index('function renderDetailCategoryBlock(site)',a);board=h[a:b]
+          board=one(board,'    sites.forEach(s=>{','    sites.filter(s=>isSiteVisibleByCompletion(s)).forEach(s=>{')
+          board=one(board,"const bucket = taskCategoryOverride[s.name] || 'sudden';","const bucket = dashboardWorkCategory(s);")
+          board=one(board,'    (window.suddenWorkStore||[]).forEach(w=>{','    (window.suddenWorkStore||[]).forEach(w=>{\n      if(seen.has(w.siteName)||(window.dashboardExcludedCompletedNames||new Set()).has(w.siteName))return;')
+          board=one(board,'if(countEl) countEl.textContent = fullList.length;','if(countEl) countEl.textContent = fullList.filter(item=>!item.manual).length;')
+          board=one(board,'    sectionMap.forEach(([key,elId,countId,emptyMsg])=>{',"""    const panel=document.getElementById('cards-daily')?.closest('.panel')||document.getElementById('schedule');
+              if(panel){let summary=document.getElementById('schedule-contract-summary');if(!summary){summary=document.createElement('p');summary.id='schedule-contract-summary';panel.prepend(summary);}const items=Object.values(buckets).flat();const n=items.filter(x=>!x.manual).length;summary.textContent='이번달 관리 계약 '+n+'건 · 5개 분류 합계 '+n+'건 · 수동 작업 '+items.filter(x=>x.manual).length+'건(계약 집계 제외)';}
+              sectionMap.forEach(([key,elId,countId,emptyMsg])=>{""")
+          h=h[:a]+board+h[b:]
+          h=one(h,'  taskCategoryOverride[item.itemKey] = category;','  taskCategoryOverride[item.itemKey] = category;\n  item.s.workManagement=CATEGORY_LABELS[category];')
+          h=one(h,"select.value = taskCategoryOverride[site.name] || 'sudden';","select.value = dashboardWorkCategory(site);")
+          h=one(h,'    taskCategoryOverride[site.name] = select.value;','    taskCategoryOverride[site.name] = select.value;\n    site.workManagement=CATEGORY_LABELS[select.value];')
+          h=h.replace('공사명/회사명/감독자 검색','공사명/회사명/책임자 검색')
+          h=one(h,'content="activity-week-20261026"','content="completion-date-policy-20261111"')
+          for old in ['Completion reporting follows latest representative status and edit MONTH, not planned end date.']:
+              s=s.replace(old,'Completion reporting uses Notion completion date, never edit month.');h=h.replace(old,'Completion reporting uses Notion completion date, never edit month.')
+          T=r'''const assert=require('assert');const at=new Date('2026-11-11T12:46:00Z');let n=0;function check(v){assert(v);n++;}const done=(d,e='2026-11-11')=>({status:'공사완료',completedAt:d,lastEdited:e});check(!isSiteVisibleByCompletion(done('2026-10-25'),at));check(isSiteVisibleByCompletion(done('2026-11-10'),at));check(isSiteVisibleByCompletion(done('2026-11-01','2026-10-31'),at));check(!isSiteVisibleByCompletion(done('2026-11-10'),new Date('2026-12-01T00:00:00+09:00')));check(isSiteVisibleByCompletion(done('2026-10-31T15:00:00Z'),at));check(isCompletionDateReview(done(null),at));check(!isSiteVisibleByCompletion(done(null),at));check(isCompletionDateReview(done('2026-11-30'),at));check(!isSiteVisibleByCompletion(done('2026-11-30'),at));check(isCompletionDateReview(done('not-a-date'),at));check(!isSiteVisibleByCompletion({...done(null),end:'2026-11-10'},at));check(isSiteVisibleByCompletion({status:'진행 중',completedAt:'2026-10-01'},at));const overdue=(v,c)=>dashboardIsOverdue({},v,c,at);check(!overdue(['2026-11-10'],['2026-10-28']));check(!overdue(['2026-11-01'],['2026-10-01']));check(!overdue(['2026-10-01'],['2026-11-10']));check(overdue(['2026-10-28'],['2026-10-20']));check(!overdue(['2026-10-29'],[]));check(overdue([],[]));check(overdue(['2026-11-20'],['2026-10-01']));check(dashboardWorkCategory({})==='sudden');check(dashboardWorkCategory({workManagement:'기타'})==='sudden');for(const [label,key] of [['매일 작업','daily'],['주간 작업','weekly'],['월간 작업','monthly'],['불시 작업','sudden'],['연락 회신 작업','reply']])check(dashboardWorkCategory({workManagement:label})===key);const rt=v=>({type:'rich_text',rich_text:[{plain_text:v}]}),ph=v=>({type:'phone_number',phone_number:v});const props={'책임자':rt('A'),'책임자 연락처':ph('010-1111-2222'),'감독자':rt('B'),'감독자 연락처':ph('010-9999-9999'),'완료처리일':{type:'date',date:{start:'2026-11-10'}}};const mapped=pageToSite({id:'p1',properties:props,last_edited_time:'2026-11-11'});check(mapped.managerName==='A');check(mapped.contact==='010-1111-2222');check(mapped.completedAt==='2026-11-10');check(pageToSite({properties:{'감독자':rt('B')}}).managerName==='');const changes=buildSiteUpdatesFromProperties(props,{managerName:'C',contact:'010-2222-3333'});check(!!changes['책임자']&&!changes['감독자']);check(!!changes['책임자 연락처']&&!changes['감독자 연락처']);const g=groupSites([{id:'old',name:'현장',status:'공사완료',completedAt:'2026-10-01',lastEdited:'2026-10-01',lastVisit:'2026-10-01'},{id:'new',name:'현장',status:'진행 중',lastEdited:'2026-11-10',lastVisit:'2026-11-10'}])[0];check(g.status==='진행 중');check(g.visitDates.length===2);check(g.pageIds.length===2);console.log('Passed '+n+' policy tests');'''
+          with tempfile.TemporaryDirectory() as td:
+              p=Path(td)/'server.js';p.write_text(s);subprocess.run(['node','--check',str(p)],check=True)
+              for i,m in enumerate(re.finditer(r'<script\b[^>]*>([\s\S]*?)</script>',h)):
+                  if m.group(1).strip():
+                      p=Path(td)/f'inline-{i}.js';p.write_text(m.group(1));subprocess.run(['node','--check',str(p)],check=True)
+              u=s[s.index('function normalizeKey('):s.index('async function queryAllPages(')];w=s[s.index('function setPropertyValueForExistingProp('):s.index('function collectIndexedSlots(')];f=s[s.index('const SITE_FIELD_CANDIDATES ='):s.index('async function resolveSitePagesForUpdate(')];pure=P[:P.index('function renderCompletionReviewButton')]
+              p=Path(td)/'tests.js';p.write_text(C+u+w+f+pure+T);subprocess.run(['node',str(p)],check=True)
+          S.write_text(s);H.write_text(h);print('Verified edited files:',blob(s),blob(h))
+          PY
+      - name: Commit verified app files
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/index.js app/safety-dashboard.html
+          git diff --cached --check
+          git commit -m "Use completion date for monthly visibility and fix dashboard policies"
+          git push origin HEAD:main
