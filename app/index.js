@@ -824,4 +824,4 @@ app.use('/api', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+const httpServer = app.listen(Number(PORT), '0.0.0.0', () => { console.log('HTTP listening', JSON.stringify(httpServer.address())); }); httpServer.once('error', error => { console.error('HTTP listen error', error); process.exit(1); });
