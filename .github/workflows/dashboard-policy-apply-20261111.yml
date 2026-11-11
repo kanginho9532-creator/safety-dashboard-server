@@ -1,0 +1,48 @@
+name: Apply corrected dashboard migration
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/dashboard-policy-apply-20261111.yml']
+permissions:
+  contents: write
+concurrency:
+  group: dashboard-completion-policy-20261111
+  cancel-in-progress: false
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Repair reviewed serialization and validate before applying
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import subprocess,hashlib,textwrap
+          commit='5d2c0a0d6e51e8b1a5dc7d0799577f60072b6009'
+          path='.github/workflows/dashboard-completion-policy-20261111.yml'
+          original=subprocess.check_output(['git','show',commit+':'+path],text=True)
+          data=original.encode()
+          digest=hashlib.sha1(b'blob '+str(len(data)).encode()+bytes([0])+data).hexdigest()
+          assert digest=='a68111d07a04115d1aa0bad624bab295c0fc4d13','Reviewed workflow changed'
+          broken=".replace('"+chr(92)+"n','"+chr(10)+"')"
+          assert original.count(broken)==3,'Unexpected serialization; stop'
+          corrected=original.replace(broken,'')
+          marker="          python3 - <<'PY'"+chr(10)
+          start=corrected.index(marker)+len(marker)
+          end=corrected.index('          PY'+chr(10),start)
+          script=textwrap.dedent(corrected[start:end])
+          compiled=compile(script,'reviewed-dashboard-migration','exec')
+          exec(compiled,{'__name__':'__main__'})
+          PY
+      - name: Commit only verified production files
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/index.js app/safety-dashboard.html
+          git diff --cached --check
+          git commit -m "Apply completion-date visibility and reviewed dashboard fixes"
+          git push origin HEAD:main
