@@ -5,22 +5,13 @@ const path = require('path');
 const { Client } = require('@notionhq/client');
 
 
-// Completion reporting follows latest representative status and edit MONTH, not planned end date.
-function completionDayKST(value){
-  if(!value)return '';
-  const text=String(value);
-  if(/^\d{4}-\d{2}-\d{2}$/.test(text))return text;
-  const date=new Date(value);
-  return Number.isNaN(date.getTime())?'':new Date(date.getTime()+9*3600000).toISOString().slice(0,10);
-}
-function completionMonthKST(value){ return completionDayKST(value).slice(0,7); }
-function isLatestStatusCompleted(site){ return String(site&&site.status||'').replace(/\s+/g,'')==='공사완료'; }
-function isThisMonthCompleted(site,at=new Date()){
-  return isLatestStatusCompleted(site)&&completionMonthKST(site.lastEdited)===completionMonthKST(at);
-}
-function isSiteVisibleByCompletion(site,at=new Date()){
-  return !isLatestStatusCompleted(site)||isThisMonthCompleted(site,at);
-}
+// Completion reporting uses Notion completion date, never edit month.
+function completionDayKST(v){if(!v)return '';const t=String(v);if(/^\d{4}-\d{2}-\d{2}$/.test(t))return t;const d=new Date(v);return Number.isNaN(d.getTime())?'':new Date(d.getTime()+9*3600000).toISOString().slice(0,10);}
+function completionMonthKST(v){return completionDayKST(v).slice(0,7);}
+function isLatestStatusCompleted(s){return String(s&&s.status||'').replace(/\s+/g,'')==='공사완료';}
+function isThisMonthCompleted(s,at=new Date()){const d=completionDayKST(s&&s.completedAt);return isLatestStatusCompleted(s)&&!!d&&Number.isFinite(Date.parse(d))&&d.slice(0,7)===completionMonthKST(at)&&d<=completionDayKST(at);}
+function isSiteVisibleByCompletion(s,at=new Date()){return !isLatestStatusCompleted(s)||isThisMonthCompleted(s,at);}
+function isCompletionDateReview(s,at=new Date()){const d=completionDayKST(s.completedAt);return isLatestStatusCompleted(s)&&(!d||!Number.isFinite(Date.parse(d))||d>completionDayKST(at));}
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -194,7 +185,7 @@ function extractPeopleFromProperties(properties) {
 }
 function pageToSite(page) {
   const p = page.properties || {};
-  const managerEntries = extractPeopleFromProperties(p);
+  const managerEntries = [{label:'책임자',name:getPropertyString(p,['책임자']),phone:getPropertyString(p,['책임자 연락처'])}];
   const statusVal = getPropertyStatus(p, ['작업 여부', '상태']);
   const completedFlag = isLatestStatusCompleted({status:statusVal});
   return {
@@ -204,8 +195,8 @@ function pageToSite(page) {
     visits: getPropertyNumber(p, ['지도횟수', '방문횟수']) || 0,
     targetVisits: getPropertyNumber(p, ['지도횟수', '목표방문횟수']) || 0,
     lastVisit: getPropertyDate(p, ['방문일자']),
-    contact: getPropertyString(p, ['감독자 연락처', '담당자 연락처', '연락처1', '연락처']) || (managerEntries[0] && managerEntries[0].phone) || '',
-    managerName: getPropertyString(p, ['감독자', '담당자', '담당자1']) || (managerEntries[0] && managerEntries[0].name) || '',
+    contact: getPropertyString(p,['책임자 연락처']),
+    managerName: getPropertyString(p,['책임자']),
     address: getPropertyString(p, ['현장주소', '주소']),
     start: getPropertyDate(p, ['착공일']),
     end: getPropertyDate(p, ['준공일']),
@@ -215,8 +206,10 @@ function pageToSite(page) {
     status: statusVal,
     note: getPropertyString(p, ['비고']),
     site: getPropertyString(p, ['사이트', '지역']),
-    manager: getPropertyString(p, ['감독자', '담당자']) || '',
+    manager: getPropertyString(p,['책임자']),
     responsible: getPropertyString(p, ['책임자']) || '',
+    workManagement: getPropertyString(p,['작업관리']) || '불시 작업',
+    completedAt: getPropertyDate(p,['완료처리일']),
     managerEntries,
     bizOpenNo: getPropertyString(p, ['사업장개시번호']),
     bizMgmtNo: getPropertyString(p, ['사업장관리번호']),
@@ -422,7 +415,7 @@ app.get('/api/contracts', async (req, res) => {
     const sites = groupedSites.filter(s=>isSiteVisibleByCompletion(s));
     const visibleNames = new Set(sites.map(s=>s.name));
     const excluded = rawSites.filter(s=>!visibleNames.has(s.name)).length;
-    res.json({ ok: true, count: sites.length, rawCount: rawSites.length, excludedByCompletion: excluded, completedSiteNames: Array.from(completedNames), sites });
+    res.json({ ok: true, count: sites.length, rawCount: rawSites.length, excludedByCompletion: excluded, completedSiteNames: groupedSites.filter(isLatestStatusCompleted).map(s=>s.name), excludedSiteNames: groupedSites.filter(s=>!isSiteVisibleByCompletion(s)).map(s=>s.name), completionReviewSites: groupedSites.filter(s=>isCompletionDateReview(s)), sites });
   } catch (err) {
     console.error('contracts error:', err);
     res.status(500).json({ ok: false, error: err.message });
@@ -430,13 +423,14 @@ app.get('/api/contracts', async (req, res) => {
 });
 
 app.get('/api/companies', async (req, res) => {
+  res.set('Cache-Control','no-store');
   try {
     if (!DB_ID) throw new Error('NOTION_DATABASE_ID not set');
     const contractPages = await queryAllPages(DB_ID);
     const rawSites = contractPages.map(pageToSite);
     const companyPages = COMPANY_DB_ID ? await queryAllPages(COMPANY_DB_ID) : [];
     const visibleNames = new Set(groupSites(rawSites).filter(s=>isSiteVisibleByCompletion(s)).map(s=>s.name));
-    const companies = buildCompaniesV2(rawSites.filter(s=>visibleNames.has(s.name)), companyPages).filter(c=>(c.contracts||[]).length>0);
+    const companies = buildCompaniesV2(groupSites(rawSites).filter(s=>visibleNames.has(s.name)), companyPages).filter(c=>(c.contracts||[]).length>0);
     res.json({ ok: true, count: companies.length, companies, companyDbEnabled: Boolean(COMPANY_DB_ID) });
   } catch (err) {
     console.error('companies error:', err);
@@ -697,8 +691,8 @@ async function updateCompanyPagesV2(payload) {
 const SITE_FIELD_CANDIDATES = {
   name: ['공사명', '현장명'],
   company: ['회사명', '회사', '업체명', 'F회사명'],
-  managerName: ['담당자1', '담당자', '감독자'],
-  contact: ['연락처1', '담당자 연락처', '감독자 연락처', '연락처', '전화번호1'],
+  managerName: ['책임자'],
+  contact: ['책임자 연락처'],
   address: ['현장주소', '주소'],
   start: ['착공일'],
   end: ['준공일'],
