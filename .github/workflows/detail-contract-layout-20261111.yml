@@ -1,0 +1,55 @@
+name: Arrange contract detail fields
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/detail-contract-layout-20261111.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and rearrange only the contract detail fields
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,re,subprocess,tempfile
+          p=Path('app/safety-dashboard.html');h=p.read_text();b=h.encode()
+          assert hashlib.sha1(b'blob '+str(len(b)).encode()+bytes([0])+b).hexdigest()=='be6a047bcd9fcf077111f1f39971f3db847b200b','HTML changed; stop for review'
+          start='    <div class="detail-normal-row">'+chr(10)+'      <div class="item"><div class="lbl">계약일</div>'
+          end='    <div id="detail-company" style="display:none;"></div>'
+          assert h.count(start)==1 and h.count(end)==1,'Detail layout anchors changed'
+          a=h.index(start);z=h.index(end,a)
+          old=h[a:z]
+          ids=['detail-contract-date','detail-start-date','detail-end-date','detail-mgmt-no','detail-amount','detail-biz-mgmt-no','detail-biz-open-no','detail-site']
+          assert all(old.count('id="'+i+'"')==1 for i in ids),'Existing field IDs changed'
+          replacement='    <div class="detail-normal-row detail-contract-fields" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;"><div class="item"><div class="lbl">계약일</div><div id="detail-contract-date">-</div></div><div class="item"><div class="lbl">완료처리일</div><div id="detail-completion-date">-</div></div><div class="item"><div class="lbl">착공일</div><div id="detail-start-date">-</div></div><div class="item"><div class="lbl">준공일</div><div id="detail-end-date">-</div></div><div class="item"><div class="lbl">관리번호</div><div id="detail-mgmt-no">-</div></div><div class="item"><div class="lbl">기술지도 계약금액(VAT포함)</div><div id="detail-amount">-</div></div><div class="item"><div class="lbl">사업장관리번호</div><div id="detail-biz-mgmt-no">-</div></div><div class="item"><div class="lbl">사업장개시번호</div><div id="detail-biz-open-no">-</div></div></div><div class="item" style="display:none;"><div id="detail-site">-</div></div>'+chr(10)
+          h=h[:a]+replacement+h[z:]
+          anchor='function renderDetailCategoryBlock(site){'
+          assert h.count(anchor)==1,'Detail renderer changed'
+          h=h.replace(anchor,anchor+"const completion=document.getElementById('detail-completion-date');if(completion)completion.textContent=completionDayKST(site.completedAt)||'미입력';",1)
+          marker='content="completion-date-policy-20261111"'
+          assert h.count(marker)==1,'Build marker changed'
+          h=h.replace(marker,'content="detail-contract-layout-20261111"',1)
+          assert all(h.count('id="'+i+'"')==1 for i in ids+['detail-completion-date']),'Duplicate or missing field IDs'
+          with tempfile.TemporaryDirectory() as td:
+              scripts=list(re.finditer(r'<script\b[^>]*>([\s\S]*?)</script>',h))
+              assert scripts,'No scripts found'
+              for i,m in enumerate(scripts):
+                  if m.group(1).strip():
+                      f=Path(td)/('inline-'+str(i)+'.js');f.write_text(m.group(1));subprocess.run(['node','--check',str(f)],check=True)
+          p.write_text(h)
+          print('Validated four-row detail layout; existing field IDs preserved')
+          PY
+      - name: Commit validated HTML only
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/safety-dashboard.html
+          git diff --cached --check
+          git commit -m "Arrange contract detail fields and show completion date"
+          git push origin HEAD:main
