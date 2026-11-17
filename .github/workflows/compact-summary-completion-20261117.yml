@@ -1,0 +1,62 @@
+name: Compact work summary and hide completed completion alerts
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/compact-summary-completion-20261117.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch scoped styles and shared completion filters, then test
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,re,subprocess,tempfile
+          p=Path('app/safety-dashboard.html');h=p.read_text();b=h.encode()
+          assert hashlib.sha1(b'blob '+str(len(b)).encode()+bytes([0])+b).hexdigest()=='8611fbbbd8b25ab3411000a37a90e908a77b6cd3','HTML changed; stop for review'
+          start=h.index('function renderWorkContractSummary(');end=h.index('function dashboardWorkCategory(',start)
+          block=h[start:end]
+          changes=[("box.className='panel';","box.className='panel';box.style.cssText='padding:8px 10px;margin-bottom:8px;';"),("title.textContent='작업관리 계약 현황';","title.textContent='작업관리 계약 현황';title.style.cssText='font-size:13px;margin:0 0 6px;';"),('grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px;','grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-bottom:6px;'),('padding:14px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;','display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;'),("value.style.cssText='font-size:'+(key==='ongoing'?34:28)+'px;font-weight:800;color:'+color+';margin-top:6px;';","value.style.cssText='font-size:16px;font-weight:700;color:'+color+';margin:0;white-space:nowrap;';"),('gap:8px;font-size:13px;','gap:6px;font-size:13px;'),('padding:6px 10px;border-radius:8px;background:#eff6ff;','padding:3px 8px;border-radius:6px;background:#eff6ff;'),('margin:10px 0 0;','margin:6px 0 0;')]
+          for old,new in changes:
+              assert block.count(old)==1,('Summary style changed',old)
+              block=block.replace(old,new,1)
+          h=h[:start]+block+h[end:]
+          filters=[('dedupeSitesByName(sites).filter(s=> s.end && daysUntil(s.end)>=0 && daysUntil(s.end)<=30 )','dedupeSitesByName(sites).filter(s=> !isLatestStatusCompleted(s) && s.end && daysUntil(s.end)>=0 && daysUntil(s.end)<=30 )'),('getDashboardSites().filter(site => site.end && daysUntil(site.end) >= 0 && daysUntil(site.end) <= 30 )','getDashboardSites().filter(site => !isLatestStatusCompleted(site) && site.end && daysUntil(site.end) >= 0 && daysUntil(site.end) <= 30 )')]
+          for old,new in filters:
+              assert h.count(old)==1,('Completion filter changed',old)
+              h=h.replace(old,new,1)
+          marker='content="work-contract-summary-20261111"'
+          assert h.count(marker)==1,'Build marker changed'
+          h=h.replace(marker,'content="compact-work-summary-20261117"',1)
+          with tempfile.TemporaryDirectory() as td:
+              scripts=list(re.finditer(r'<script\b[^>]*>([\s\S]*?)</script>',h))
+              assert scripts,'No inline scripts found'
+              for i,m in enumerate(scripts):
+                  if m.group(1).strip():
+                      f=Path(td)/('inline-'+str(i)+'.js');f.write_text(m.group(1));subprocess.run(['node','--check',str(f)],check=True)
+              names=['completionDayKST','completionMonthKST','isLatestStatusCompleted','isThisMonthCompleted','isSiteVisibleByCompletion']
+              completion=chr(10).join(re.search(r'^function '+name+r'\([^\n]*',h,re.M).group(0) for name in names)+chr(10)
+              a=h.index('function summarizeWorkContracts(');z=h.index('function dashboardWorkCategory(',a);summary=h[a:z]
+              legacy=re.search(r'^function getCompletionSoon\(\)\{[^\n]*',h,re.M).group(0)
+              a=h.index('window.getCompletionSoon = function(){');z=h.index(chr(10)+'  };',a)+6;window_filter=h[a:z]
+              tests=r'''const assert=require('assert');let checks=0;const at=new Date('2026-11-17T00:00:00Z');function check(v){assert(v);checks++;}const nodes=new Map();class E{constructor(){this.children=[];this.style={};}set id(v){this._id=v;nodes.set(v,this);}get id(){return this._id;}setAttribute(){}replaceChildren(){this.children=[];}append(...x){this.children.push(...x);}appendChild(x){this.children.push(x);}prepend(x){this.children=this.children.filter(v=>v!==x);this.children.unshift(x);}}const page=new E();nodes.set('schedule',page);const document={getElementById:id=>nodes.get(id)||null,createElement:()=>new E()};const sites=[{name:'today',status:'진행 중',end:'2026-11-17'},{name:'next',status:'진행 중',end:'2026-11-20'},{name:'30days',status:'공사중지',end:'2026-12-17'},{name:'31days',status:'진행 중',end:'2026-12-18'},{name:'past',status:'진행 중',end:'2026-11-16'},{name:'October completed',status:'공사완료',completedAt:'2026-10-20',lastEdited:'2026-11-17',end:'2026-11-20'},{name:'November completed',status:'공사완료',completedAt:'2026-11-10',end:'2026-11-20'},{name:'No completion date',status:'공사완료',end:'2026-11-20'},{name:'No planned end',status:'진행 중'}];function dedupeSitesByName(x){return x;}function daysUntil(d){return Math.ceil((Date.parse(d)-at)/86400000);}function getDashboardSites(){return sites.filter(s=>isSiteVisibleByCompletion(s,at));}check(getCompletionSoon().map(s=>s.name).join(',')==='today,next,30days');check(!isSiteVisibleByCompletion(sites[5],at));check(isSiteVisibleByCompletion(sites[6],at));const window={};WINDOW_FILTER
+          check(window.getCompletionSoon().map(s=>s.name).join(',')==='today,next,30days');renderWorkContractSummary({daily:[{s:sites[0]},{s:sites[6]}]},at);const box=nodes.get('schedule-contract-summary'),grid=box.children[1];check(nodes.get('schedule-total-ongoing').textContent==='1건');check(nodes.get('schedule-total-total').textContent==='2건');check(nodes.get('schedule-total-completed').textContent==='1건');check(box.style.cssText.includes('padding:8px 10px'));check(box.children[0].style.cssText.includes('font-size:13px'));for(const card of grid.children){check(card.children[0].style.cssText.includes('font-size:13px'));check(card.children[1].style.cssText.includes('font-size:16px'));check(card.style.cssText.includes('padding:6px 8px'));}check(grid.style.cssText.includes('gap:6px'));console.log('Passed '+checks+' compact summary and completion exclusion checks');'''
+              tests=tests.replace('WINDOW_FILTER',window_filter)
+              f=Path(td)/'regression.js';f.write_text(completion+summary+legacy+tests);subprocess.run(['node',str(f)],check=True)
+          p.write_text(h)
+          print('Validated compact summary and completed-site exclusion; no server or Notion writes')
+          PY
+      - name: Commit validated HTML only
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/safety-dashboard.html
+          git diff --cached --check
+          git commit -m "Compact work contract summary and exclude completed sites from upcoming completion"
+          git push origin HEAD:main
