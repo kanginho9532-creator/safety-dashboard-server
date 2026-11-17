@@ -1,0 +1,63 @@
+name: Add clickable work contract summaries and remove duplicate category chips
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/work-summary-click-lists-20261117.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source, patch work summary, and test
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,re,subprocess,tempfile
+          p=Path('app/safety-dashboard.html');h=p.read_text();b=h.encode()
+          assert hashlib.sha1(b'blob '+str(len(b)).encode()+bytes([0])+b).hexdigest()=='f75af44ecb480c0a5c63d32a409562faee4b22a2','HTML changed; stop for review'
+          assert 'function getWorkContractList(' not in h,'Already patched'
+          a=h.index('function summarizeWorkContracts(');z=h.index('function dashboardWorkCategory(',a);block=h[a:z]
+          changes=[('const result={total:0,','const result={entries:[],total:0,'),('if(!isSiteVisibleByCompletion(site,at))return;result.total++;','if(!isSiteVisibleByCompletion(site,at))return;result.entries.push({site,category});result.total++;'),("const card=document.createElement('div');","const card=document.createElement('button');card.type='button';card.title=label+' 목록 보기';card.onclick=()=>openWorkContractList(key,buckets);"),("card.style.cssText='display:flex;","card.style.cssText='cursor:pointer;text-align:left;font:inherit;display:flex;")]
+          for old,new in changes:
+              assert block.count(old)==1,('Summary source changed',old)
+              block=block.replace(old,new,1)
+          assert block.count("const categories=document.createElement('div');")==1
+          assert block.count('box.appendChild(categories);')==1
+          start=block.index("const categories=document.createElement('div');");end=block.index('box.appendChild(categories);',start)+len('box.appendChild(categories);')
+          block=block[:start]+block[end:]
+          helpers=r'''function getWorkContractList(buckets,key,at=new Date()){if(!['total','ongoing','stopped','completed','other'].includes(key))return [];return summarizeWorkContracts(buckets,at).entries.filter(({site})=>{if(key==='total')return true;const status=String(site.status||'').replace(/\s+/g,'');const group=status==='진행중'?'ongoing':status==='공사중지'?'stopped':status==='공사완료'?'completed':'other';return group===key;});}
+          function openWorkContractList(key,buckets){const labels={ongoing:'진행 중 계약',total:'전체 관리 계약',stopped:'공사중지',completed:'이번달 완료',other:'신규·기타'};if(!labels[key])return;const items=getWorkContractList(buckets,key).sort((a,b)=>String(a.site.name).localeCompare(String(b.site.name),'ko'));const opener=document.activeElement;document.getElementById('work-contract-list-modal')?.remove();const overlay=document.createElement('div');overlay.id='work-contract-list-modal';overlay.className='modal-overlay active';overlay.style.zIndex='1100';const box=document.createElement('div');box.className='modal-box';box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');box.setAttribute('aria-labelledby','work-contract-list-title');const title=document.createElement('h3');title.id='work-contract-list-title';title.textContent=labels[key]+' ('+items.length+'건)';title.style.marginRight='40px';const close=()=>{overlay.remove();if(opener&&opener.isConnected)opener.focus();};const closeButton=document.createElement('button');closeButton.type='button';closeButton.className='modal-close-btn';closeButton.textContent='×';closeButton.setAttribute('aria-label','계약 목록 닫기');closeButton.onclick=close;const search=document.createElement('input');search.type='search';search.className='search-box';search.placeholder='현장명·회사명·상태 검색';search.setAttribute('aria-label','계약 목록 검색');search.style.cssText='width:100%;margin-bottom:10px;';const count=document.createElement('p');count.style.cssText='font-size:13px;color:#64748b;';count.setAttribute('aria-live','polite');const list=document.createElement('div');const categories={daily:'매일',weekly:'주간',monthly:'월간',sudden:'불시',reply:'연락 회신'};function render(){const q=search.value.trim().toLowerCase();const rows=items.filter(({site,category})=>[site.name,site.company,site.status,categories[category]].filter(Boolean).join(' ').toLowerCase().includes(q));list.replaceChildren();count.textContent='전체 '+items.length+'건'+(q?' · 검색 결과 '+rows.length+'건':'');if(!rows.length){const empty=document.createElement('p');empty.className='company-empty';empty.textContent=q?'검색 결과가 없습니다.':'해당 상태의 계약이 없습니다.';list.appendChild(empty);return;}rows.forEach(({site,category})=>{const row=document.createElement('button');row.type='button';row.className='kpi-list-row';row.style.cssText='width:100%;text-align:left;font:inherit;';const name=document.createElement('strong');name.textContent=site.name;name.title=site.name;const meta=document.createElement('span');meta.textContent=[site.company,site.status||'신규·기타',categories[category]].filter(Boolean).join(' · ');meta.title=meta.textContent;meta.style.cssText='max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';row.append(name,meta);row.onclick=()=>{close();openDetailByName(site.name);};list.appendChild(row);});}search.oninput=render;overlay.onclick=e=>{if(e.target===overlay)close();};overlay.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close();}else if(e.key==='Tab'){const focusable=Array.from(box.querySelectorAll('button,input'));const first=focusable[0],last=focusable[focusable.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}};box.append(title,closeButton,search,count,list);overlay.appendChild(box);document.body.appendChild(overlay);render();search.focus();}
+          '''
+          h=h[:a]+block+helpers+h[z:]
+          marker='content="compact-work-summary-20261117"'
+          assert h.count(marker)==1,'Build marker changed'
+          h=h.replace(marker,'content="work-summary-click-lists-20261117"',1)
+          with tempfile.TemporaryDirectory() as td:
+              scripts=list(re.finditer(r'<script\b[^>]*>([\s\S]*?)</script>',h));assert scripts
+              for i,m in enumerate(scripts):
+                  if m.group(1).strip():
+                      f=Path(td)/('inline-'+str(i)+'.js');f.write_text(m.group(1));subprocess.run(['node','--check',str(f)],check=True)
+              names=['completionDayKST','completionMonthKST','isLatestStatusCompleted','isThisMonthCompleted','isSiteVisibleByCompletion']
+              completion=chr(10).join(re.search(r'^function '+name+r'\([^\n]*',h,re.M).group(0) for name in names)+chr(10)
+              a=h.index('function summarizeWorkContracts(');z=h.index('function renderWorkContractSummary(',a);summary=h[a:z]
+              tests=r'''const assert=require('assert');let checks=0;function check(v){assert(v);checks++;}const at=new Date('2026-11-17T00:00:00Z');const item=(name,status,extra={})=>({s:{name,status,...extra}});const buckets={daily:[item('A','진행 중'),item('dup','진행 중',{lastEdited:'2026-11-01'})],weekly:[item('B','공사중지'),item('dup','공사중지',{lastEdited:'2026-11-15'})],monthly:[item('C','공사완료',{completedAt:'2026-11-10'})],sudden:[item('D','새로 만들기'),item('old','공사완료',{completedAt:'2026-10-31',lastEdited:'2026-11-17'}),{manual:true,s:{name:'manual',status:'진행 중'}}],reply:[item('E','진행 중')]};const result=summarizeWorkContracts(buckets,at);for(const key of ['total','ongoing','stopped','completed','other'])check(getWorkContractList(buckets,key,at).length===result[key]);check(result.total===6);check(result.ongoing===2);check(result.stopped===2);check(result.completed===1);check(result.other===1);check(result.manual===1);check(!getWorkContractList(buckets,'total',at).some(x=>['old','manual'].includes(x.site.name)));check(getWorkContractList(buckets,'stopped',at).some(x=>x.site.name==='dup'));check(getWorkContractList({},'total',at).length===0);check(getWorkContractList(buckets,'invalid',at).length===0);console.log('Passed '+checks+' shared summary and contract list checks');'''
+              f=Path(td)/'list-tests.js';f.write_text(completion+summary+helpers+tests);subprocess.run(['node',str(f)],check=True)
+              assert 'box.appendChild(categories);' not in block
+              assert "createElement('button');card.type='button';" in block
+              assert 'card.onclick=()=>openWorkContractList(key,buckets);' in block
+          p.write_text(h)
+          print('Validated shared summary/list counts and duplicate-label removal; no server or Notion writes')
+          PY
+      - name: Commit validated HTML only
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/safety-dashboard.html
+          git diff --cached --check
+          git commit -m "Make work contract summary cards open matching lists and remove duplicate category chips"
+          git push origin HEAD:main
