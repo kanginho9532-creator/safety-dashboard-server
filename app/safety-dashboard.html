@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>안전관리 통합 대시보드</title>
-<meta name="dashboard-build" content="work-contract-summary-20261111">
+<meta name="dashboard-build" content="compact-work-summary-20261117">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2563eb">
 <style>
@@ -978,10 +978,10 @@ function summarizeWorkContracts(buckets,at=new Date()){
   return result;
 }
 function renderWorkContractSummary(buckets,at=new Date()){
-  const page=document.getElementById('schedule');if(!page)return;const data=summarizeWorkContracts(buckets,at);let box=document.getElementById('schedule-contract-summary');if(!box){box=document.createElement('section');box.id='schedule-contract-summary';}box.className='panel';box.setAttribute('aria-label','작업관리 계약 현황');box.replaceChildren();page.prepend(box);
-  const title=document.createElement('h3');title.textContent='작업관리 계약 현황';box.appendChild(title);const grid=document.createElement('div');grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px;';
-  [['진행 중 계약','ongoing','#2563eb'],['전체 관리 계약','total','#0f172a'],['공사중지','stopped','#64748b'],['이번달 완료','completed','#15803d'],['신규·기타','other','#7c3aed']].forEach(([label,key,color])=>{const card=document.createElement('div');card.style.cssText='padding:14px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;';const caption=document.createElement('div');caption.textContent=label;caption.style.cssText='font-size:13px;color:#64748b;';const value=document.createElement('div');value.id='schedule-total-'+key;value.textContent=data[key]+'건';value.style.cssText='font-size:'+(key==='ongoing'?34:28)+'px;font-weight:800;color:'+color+';margin-top:6px;';card.append(caption,value);grid.appendChild(card);});box.appendChild(grid);
-  const categories=document.createElement('div');categories.style.cssText='display:flex;flex-wrap:wrap;gap:8px;font-size:13px;';[['매일','daily'],['주간','weekly'],['월간','monthly'],['불시','sudden'],['연락 회신','reply']].forEach(([label,key])=>{const chip=document.createElement('span');chip.textContent=label+' '+data.categories[key]+'건';chip.style.cssText='padding:6px 10px;border-radius:8px;background:#eff6ff;color:#1e40af;';categories.appendChild(chip);});box.appendChild(categories);const note=document.createElement('p');note.style.cssText='font-size:12px;color:#64748b;margin:10px 0 0;';note.textContent='5개 분류 합계 '+data.total+'건 · 검색과 무관한 전체 계약 기준 · 수동 작업 '+data.manual+'건은 계약 합계 제외. 전체 관리 계약에는 공사중지·이번달 완료·신규·기타가 포함됩니다.';box.appendChild(note);
+  const page=document.getElementById('schedule');if(!page)return;const data=summarizeWorkContracts(buckets,at);let box=document.getElementById('schedule-contract-summary');if(!box){box=document.createElement('section');box.id='schedule-contract-summary';}box.className='panel';box.style.cssText='padding:8px 10px;margin-bottom:8px;';box.setAttribute('aria-label','작업관리 계약 현황');box.replaceChildren();page.prepend(box);
+  const title=document.createElement('h3');title.textContent='작업관리 계약 현황';title.style.cssText='font-size:13px;margin:0 0 6px;';box.appendChild(title);const grid=document.createElement('div');grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-bottom:6px;';
+  [['진행 중 계약','ongoing','#2563eb'],['전체 관리 계약','total','#0f172a'],['공사중지','stopped','#64748b'],['이번달 완료','completed','#15803d'],['신규·기타','other','#7c3aed']].forEach(([label,key,color])=>{const card=document.createElement('div');card.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;';const caption=document.createElement('div');caption.textContent=label;caption.style.cssText='font-size:13px;color:#64748b;';const value=document.createElement('div');value.id='schedule-total-'+key;value.textContent=data[key]+'건';value.style.cssText='font-size:16px;font-weight:700;color:'+color+';margin:0;white-space:nowrap;';card.append(caption,value);grid.appendChild(card);});box.appendChild(grid);
+  const categories=document.createElement('div');categories.style.cssText='display:flex;flex-wrap:wrap;gap:6px;font-size:13px;';[['매일','daily'],['주간','weekly'],['월간','monthly'],['불시','sudden'],['연락 회신','reply']].forEach(([label,key])=>{const chip=document.createElement('span');chip.textContent=label+' '+data.categories[key]+'건';chip.style.cssText='padding:3px 8px;border-radius:6px;background:#eff6ff;color:#1e40af;';categories.appendChild(chip);});box.appendChild(categories);const note=document.createElement('p');note.style.cssText='font-size:12px;color:#64748b;margin:6px 0 0;';note.textContent='5개 분류 합계 '+data.total+'건 · 검색과 무관한 전체 계약 기준 · 수동 작업 '+data.manual+'건은 계약 합계 제외. 전체 관리 계약에는 공사중지·이번달 완료·신규·기타가 포함됩니다.';box.appendChild(note);
 }
 
 function dashboardWorkCategory(s){const p=s&&s.rawProperties&&s.rawProperties['작업관리'];const v=String(s&&s.workManagement||(p&&((p.select&&p.select.name)||(p.status&&p.status.name)))||'').replace(/\s+/g,'');return ({'매일작업':'daily','주간작업':'weekly','월간작업':'monthly','불시작업':'sudden','연락회신작업':'reply'})[v]||'sudden';}
@@ -2110,7 +2110,7 @@ function getNeverVisited(){
     return inMonth(v) || inMonth(c);
   });
 }
-function getCompletionSoon(){ return dedupeSitesByName(sites).filter(s=> s.end && daysUntil(s.end)>=0 && daysUntil(s.end)<=30 ).sort((a,b)=>daysUntil(a.end)-daysUntil(b.end)); }
+function getCompletionSoon(){ return dedupeSitesByName(sites).filter(s=> !isLatestStatusCompleted(s) && s.end && daysUntil(s.end)>=0 && daysUntil(s.end)<=30 ).sort((a,b)=>daysUntil(a.end)-daysUntil(b.end)); }
 function refreshKPIs(){
   const uniqueSites = dedupeSitesByName(sites);
   document.getElementById('kpi-total').textContent=uniqueSites.length;
@@ -3298,7 +3298,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return getDashboardSites().filter(site => site.visits === 0 && (visitStore[site.name] || []).length === 0 );
   };
   window.getCompletionSoon = function(){
-    return getDashboardSites().filter(site => site.end && daysUntil(site.end) >= 0 && daysUntil(site.end) <= 30 ).sort((a,b)=>daysUntil(a.end)-daysUntil(b.end));
+    return getDashboardSites().filter(site => !isLatestStatusCompleted(site) && site.end && daysUntil(site.end) >= 0 && daysUntil(site.end) <= 30 ).sort((a,b)=>daysUntil(a.end)-daysUntil(b.end));
   };
   window.refreshKPIs = function(){
     const allSites = dedupeSitesByName(sites);
