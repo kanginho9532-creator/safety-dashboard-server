@@ -1,0 +1,70 @@
+name: Show prominent work contract totals
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/work-contract-summary-20261111.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source, update work summary, and test
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,re,subprocess,tempfile
+          p=Path('app/safety-dashboard.html');h=p.read_text();b=h.encode()
+          assert hashlib.sha1(b'blob '+str(len(b)).encode()+bytes([0])+b).hexdigest()=='0d3cdf44b023a96c12e33adf4c292e45b4bada03','HTML changed; stop for review'
+          helpers=r'''function summarizeWorkContracts(buckets,at=new Date()){
+            const keys=['daily','weekly','monthly','sudden','reply'];
+            const result={total:0,ongoing:0,stopped:0,completed:0,other:0,manual:0,categories:Object.fromEntries(keys.map(k=>[k,0]))};
+            const unique=new Map();
+            Object.entries(buckets||{}).forEach(([category,items])=>(items||[]).forEach(item=>{if(item.manual){result.manual++;return;}const site=item.s;if(!site||!site.name)return;const previous=unique.get(site.name);if(!previous||(Date.parse(site.lastEdited)||0)>(Date.parse(previous.site.lastEdited)||0))unique.set(site.name,{site,category:keys.includes(category)?category:'sudden'});}));
+            unique.forEach(({site,category})=>{if(!isSiteVisibleByCompletion(site,at))return;result.total++;result.categories[category]++;const state=String(site.status||'').replace(/\s+/g,'');if(state==='진행중')result.ongoing++;else if(state==='공사중지')result.stopped++;else if(state==='공사완료')result.completed++;else result.other++;});
+            return result;
+          }
+          function renderWorkContractSummary(buckets,at=new Date()){
+            const page=document.getElementById('schedule');if(!page)return;const data=summarizeWorkContracts(buckets,at);let box=document.getElementById('schedule-contract-summary');if(!box){box=document.createElement('section');box.id='schedule-contract-summary';}box.className='panel';box.setAttribute('aria-label','작업관리 계약 현황');box.replaceChildren();page.prepend(box);
+            const title=document.createElement('h3');title.textContent='작업관리 계약 현황';box.appendChild(title);const grid=document.createElement('div');grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px;';
+            [['진행 중 계약','ongoing','#2563eb'],['전체 관리 계약','total','#0f172a'],['공사중지','stopped','#64748b'],['이번달 완료','completed','#15803d'],['신규·기타','other','#7c3aed']].forEach(([label,key,color])=>{const card=document.createElement('div');card.style.cssText='padding:14px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;';const caption=document.createElement('div');caption.textContent=label;caption.style.cssText='font-size:13px;color:#64748b;';const value=document.createElement('div');value.id='schedule-total-'+key;value.textContent=data[key]+'건';value.style.cssText='font-size:'+(key==='ongoing'?34:28)+'px;font-weight:800;color:'+color+';margin-top:6px;';card.append(caption,value);grid.appendChild(card);});box.appendChild(grid);
+            const categories=document.createElement('div');categories.style.cssText='display:flex;flex-wrap:wrap;gap:8px;font-size:13px;';[['매일','daily'],['주간','weekly'],['월간','monthly'],['불시','sudden'],['연락 회신','reply']].forEach(([label,key])=>{const chip=document.createElement('span');chip.textContent=label+' '+data.categories[key]+'건';chip.style.cssText='padding:6px 10px;border-radius:8px;background:#eff6ff;color:#1e40af;';categories.appendChild(chip);});box.appendChild(categories);const note=document.createElement('p');note.style.cssText='font-size:12px;color:#64748b;margin:10px 0 0;';note.textContent='5개 분류 합계 '+data.total+'건 · 검색과 무관한 전체 계약 기준 · 수동 작업 '+data.manual+'건은 계약 합계 제외. 전체 관리 계약에는 공사중지·이번달 완료·신규·기타가 포함됩니다.';box.appendChild(note);
+          }
+          '''
+          old="    const panel=document.getElementById('cards-daily')?.closest('.panel')||document.getElementById('schedule');"+chr(10)+"    if(panel){let summary=document.getElementById('schedule-contract-summary');if(!summary){summary=document.createElement('p');summary.id='schedule-contract-summary';panel.prepend(summary);}const items=Object.values(buckets).flat();const n=items.filter(x=>!x.manual).length;summary.textContent='이번달 관리 계약 '+n+'건 · 5개 분류 합계 '+n+'건 · 수동 작업 '+items.filter(x=>x.manual).length+'건(계약 집계 제외)';}"
+          assert h.count(old)==1,'Existing summary changed'
+          assert 'function summarizeWorkContracts(' not in h,'Already patched'
+          h=h.replace(old,'    renderWorkContractSummary(buckets);',1)
+          assert '<script>' in h
+          h=h.replace('<script>','<script>'+chr(10)+helpers,1)
+          refresh='renderCompanyCards(); renderActionLog(); }'
+          assert h.count(refresh)==1,'Refresh hook changed'
+          h=h.replace(refresh,"renderCompanyCards(); renderActionLog(); if(typeof window.renderScheduleBoard==='function')window.renderScheduleBoard(); }",1)
+          marker='content="detail-contract-layout-20261111"'
+          assert h.count(marker)==1,'Build marker changed'
+          h=h.replace(marker,'content="work-contract-summary-20261111"',1)
+          tests=r'''const assert=require('assert'),at=new Date('2026-11-11T14:08:00Z');let checks=0;function check(f){f();checks++;}const item=(name,status,extra={})=>({s:{name,status,...extra}});const buckets={daily:[item('A','진행 중')],weekly:[item('B','공사중지')],monthly:[item('C','공사완료',{completedAt:'2026-11-10'})],sudden:[item('D','새로 만들기'),item('E','공사완료',{completedAt:'2026-10-31',lastEdited:'2026-11-11'}),{manual:true,s:{name:'수동 작업'}}],reply:[item('F','진행 중')]};const result=summarizeWorkContracts(buckets,at);check(()=>assert.equal(result.total,5));check(()=>assert.equal(result.ongoing,2));check(()=>assert.equal(result.stopped,1));check(()=>assert.equal(result.completed,1));check(()=>assert.equal(result.other,1));check(()=>assert.equal(result.manual,1));check(()=>assert.equal(Object.values(result.categories).reduce((a,b)=>a+b,0),result.total));check(()=>assert.equal(result.ongoing+result.stopped+result.completed+result.other,result.total));check(()=>assert.equal(summarizeWorkContracts({daily:[item('같은현장','진행 중')],weekly:[item('같은현장','진행 중')]},at).total,1));check(()=>assert.equal(summarizeWorkContracts({daily:[item('재분류','진행 중',{lastEdited:'2026-11-01'})],weekly:[item('재분류','공사중지',{lastEdited:'2026-11-10'})]},at).ongoing,0));check(()=>assert.equal(summarizeWorkContracts({daily:[item('과거완료','진행 중',{lastEdited:'2026-10-01'})],weekly:[item('과거완료','공사완료',{completedAt:'2026-10-20',lastEdited:'2026-11-10'})]},at).total,0));check(()=>assert.equal(summarizeWorkContracts({},at).total,0));check(()=>assert.equal(summarizeWorkContracts({sudden:[item('완료일미입력','공사완료')]},at).total,0));check(()=>assert.equal(summarizeWorkContracts({sudden:[item('미래완료','공사완료',{completedAt:'2026-11-30'})]},at).total,0));const nodes=new Map();class E{constructor(tag){this.tag=tag;this.children=[];this.style={};}set id(v){this._id=v;nodes.set(v,this);}get id(){return this._id;}setAttribute(){}replaceChildren(){this.children=[];}append(...v){this.children.push(...v);}appendChild(v){this.children.push(v);}prepend(v){this.children=this.children.filter(x=>x!==v);this.children.unshift(v);}}const page=new E('page');nodes.set('schedule',page);const document={getElementById:id=>nodes.get(id)||null,createElement:tag=>new E(tag)};renderWorkContractSummary(buckets,at);check(()=>assert.equal(nodes.get('schedule-total-ongoing').textContent,'2건'));check(()=>assert.equal(nodes.get('schedule-total-total').textContent,'5건'));check(()=>assert.equal(page.children[0].id,'schedule-contract-summary'));renderWorkContractSummary({},at);check(()=>assert.equal(nodes.get('schedule-total-total').textContent,'0건'));check(()=>assert.equal(page.children.length,1));console.log('Passed '+checks+' contract summary checks');'''
+          with tempfile.TemporaryDirectory() as td:
+              scripts=list(re.finditer(r'<script\b[^>]*>([\s\S]*?)</script>',h))
+              assert scripts,'No inline scripts found'
+              for i,m in enumerate(scripts):
+                  if m.group(1).strip():
+                      f=Path(td)/('inline-'+str(i)+'.js');f.write_text(m.group(1));subprocess.run(['node','--check',str(f)],check=True)
+              names=['completionDayKST','completionMonthKST','isLatestStatusCompleted','isThisMonthCompleted','isSiteVisibleByCompletion']
+              completion=chr(10).join(re.search(r'^function '+name+r'\([^\n]*',h,re.M).group(0) for name in names)+chr(10)
+              f=Path(td)/'summary-test.js';f.write_text(completion+helpers+tests);subprocess.run(['node',str(f)],check=True)
+          p.write_text(h)
+          print('Validated prominent work contract totals; no server or Notion writes')
+          PY
+      - name: Commit validated HTML only
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/safety-dashboard.html
+          git diff --cached --check
+          git commit -m "Show work contract totals and separate ongoing, stopped and completed counts"
+          git push origin HEAD:main
