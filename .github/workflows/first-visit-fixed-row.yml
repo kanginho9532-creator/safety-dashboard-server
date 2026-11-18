@@ -1,0 +1,39 @@
+name: Fix first visit button row
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/first-visit-fixed-row.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          p=Path('app/safety-dashboard.html'); h=p.read_text()
+          old='section.append(list);panel.append(section);'
+          assert h.count(old)==1
+          h=h.replace(old,old+chr(10)+'''    if(i===3){
+              const bar=el('div'), body=el('div');bar.className='fv-fixed-bar';body.className='fv-fixed-body';body.id='fv-fixed-body';body.hidden=true;
+              for(const group of panel.querySelectorAll('.fv-group')){
+                const button=el('button',group.firstElementChild.textContent), list=group.lastElementChild;button.type='button';button.setAttribute('aria-expanded','false');button.setAttribute('aria-controls',body.id);
+                button.onclick=()=>{const open=button.getAttribute('aria-expanded')!=='true';for(const b of bar.children)b.setAttribute('aria-expanded','false');button.setAttribute('aria-expanded',String(open));body.replaceChildren();body.hidden=!open;if(open){body.append(list);list.scrollTop=0;}};
+                bar.append(button);group.remove();
+              }
+              panel.append(bar,body);
+            }''',1)
+          css='#first-visit-review .fv-fixed-bar,#first-visit-review .fv-fixed-body{grid-column:1/-1;min-width:0} .fv-fixed-bar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.fv-fixed-bar button{min-width:0;min-height:44px;padding:6px 3px;border:1px solid var(--border);border-radius:9px;background:#f8fafc;color:#334155;font-size:clamp(10px,2.5vw,13px);font-weight:700;cursor:pointer}.fv-fixed-bar button[aria-expanded=true]{background:#dbeafe;border-color:#93c5fd;color:#1e40af}.fv-fixed-body{border:1px solid var(--border);border-radius:9px}'
+          h=h.replace('</style>',css+chr(10)+'</style>',1)
+          for s in re.findall(r'<script\b[^>]*>(.*?)</script>',h,re.S): subprocess.run(['node','--check'],input=s,text=True,check=True)
+          p.write_text(h)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/safety-dashboard.html
+          git diff --cached --check
+          git commit -m 'Keep first visit buttons in one row'
+          git push origin HEAD:main
