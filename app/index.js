@@ -220,10 +220,34 @@ function pageToSite(page) {
     __completed: completedFlag
   };
 }
+function visitPhotoField(k){return /^(?:사진|(?:점검|전경|교육|개선)사진)[0-9]*$/.test(String(k).replace(/\s/g,''));}
+function visitEvidence(rows,today=completionDayKST(new Date())){
+  const seen=new Set(), byDay=new Map(), confirmed=[], repeated=[];
+  if(new Set(rows.map(s=>JSON.stringify([s.company,s.contractDate,s.mgmtNo]))).size>1)return {confirmed,repeated};
+  for(const row of rows){
+    const keys=new Set();
+    for(const [k,p] of Object.entries(row.rawProperties||{})){
+      if(!visitPhotoField(k))continue;
+      const paths=p.type==='files'?(p.files||[]).map(f=>f.external?.url||f.file?.url):propToString(p).split(/[\n,;]+/);
+      for(const value of paths){const key=String(value||'').trim().split(/[?#]/)[0];if(key.includes('/')||key.includes('\\'))keys.add(key);}
+    }
+    const day=completionDayKST(row.lastVisit);
+    if(!day||!Number.isFinite(Date.parse(day))){for(const key of keys)seen.add(key);continue;}
+    if(day>today)continue;
+    if(!byDay.has(day))byDay.set(day,new Set());
+    for(const key of keys)byDay.get(day).add(key);
+  }
+  for(const day of [...byDay.keys()].sort()){const keys=byDay.get(day);if([...keys].some(k=>!seen.has(k)))confirmed.push(day);else if(keys.size)repeated.push(day);for(const k of keys)seen.add(k);}
+  return {confirmed,repeated};
+}
+
 function groupSites(rawSites) {
+  const evidenceRows = new Map();
   const grouped = {};
   rawSites.forEach((s) => {
     const key = s.name;
+    if (!evidenceRows.has(key)) evidenceRows.set(key, []);
+    evidenceRows.get(key).push(s);
     const detail = { pageId: s.id, visitDate: s.lastVisit || null, contactDate: s.contactRequest || null };
     if (!grouped[key]) {
       grouped[key] = {
@@ -248,6 +272,7 @@ function groupSites(rawSites) {
   });
   return Object.values(grouped).map((g) => ({
     ...g,
+    firstVisitEvidence: visitEvidence(evidenceRows.get(g.name)),
     visits: g.visitDates.length,
     lastVisit: g.visitDates.slice().sort().reverse()[0] || null,
     contactDates: g.contactDates.slice().sort().reverse(),
@@ -477,7 +502,7 @@ app.post('/api/duplicate-page', async (req, res) => {
     const sourcePage = await notion.pages.retrieve({ page_id: sourcePageId });
     const newProperties = {};
     for (const [key, prop] of Object.entries(sourcePage.properties || {})) {
-      if (NON_COPYABLE_TYPES.includes(prop.type)) continue;
+      if (NON_COPYABLE_TYPES.includes(prop.type) || (['방문일자','연락요청 일자'].includes(propertyName) && visitPhotoField(key))) continue;
       const cloned = cloneWritableProperty(prop);
       if (cloned) newProperties[key] = cloned;
     }
