@@ -1,0 +1,29 @@
+name: First visit layout
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/first-visit-layout.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,subprocess
+          p=Path('app/safety-dashboard.html');h=p.read_text();a=h.index('function renderFirstVisitReview(');b=h.index('function summarizeWorkContracts(',a);s=h[a:b]
+          start=s.index('row.append(button,');end=s.index('if(s.note)',start)
+          s=s[:start]+'''row.className='fv-record';const identity=el('div');identity.append(button,el('div',s.company||''));row.append(identity);const meta=el('div');meta.className='fv-meta';for(const [label,value] of [['공사 상태',s.status||'미등록'],['연락요청일',contact||'미등록'],['방문 예정',next||'—'],['실적 미확인 방문일',last||'—']]){const chip=el('div');chip.append(el('small',label),el('strong',value));meta.append(chip);}row.append(meta);'''+s[end:]
+          old='bar.append(button);group.remove();';assert s.count(old)==1
+          s=s.replace(old,'''const text=button.textContent.split(' · ');button.className='kpi '+['kpi-blue','kpi-orange','kpi-green','kpi-red'][bar.children.length];const label=el('span',text[0]),value=el('span',text[1]);label.className='label';value.className='value';button.replaceChildren(label,value);bar.append(button);group.remove();''')
+          h=h[:a]+s+h[b:]
+          css='''#first-visit-review .fv-fixed-bar button.kpi{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:12px;border-radius:14px;border-left-width:5px;border-left-color:var(--fv-accent);background:var(--card)}.fv-fixed-bar .kpi-blue{--fv-accent:#2563eb}.fv-fixed-bar .kpi-orange{--fv-accent:#f59e0b}.fv-fixed-bar .kpi-green{--fv-accent:#16a34a}.fv-fixed-bar .kpi-red{--fv-accent:#64748b}#first-visit-review .fv-fixed-bar button[aria-expanded=true]{background:#eff6ff;box-shadow:inset 0 0 0 1px #93c5fd}.fv-record{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:6px 14px;align-items:center}.fv-record>div:first-child>button{border:0;background:none;color:#1d4ed8;font:inherit;font-weight:700;text-align:left;cursor:pointer;padding:3px 0}.fv-record>details{grid-column:1/-1}.fv-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.fv-meta>div{padding:6px 8px;border:1px solid var(--border);border-radius:9px;background:#f8fafc}.fv-meta small,.fv-meta strong{display:block}.fv-meta strong{color:var(--text)}@media(max-width:760px){#first-visit-review .fv-fixed-bar button.kpi{padding:6px}.fv-record{grid-template-columns:1fr}.fv-meta{grid-template-columns:repeat(2,minmax(0,1fr))}}'''
+          h=h.replace('</style>',css+chr(10)+'</style>',1)
+          for code in re.findall(r'<script\b[^>]*>(.*?)</script>',h,re.S):subprocess.run(['node','--check'],input=code,text=True,check=True)
+          p.write_text(h)
+          PY
+          git -c user.name=github-actions -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -am 'Align first visit cards and details with dashboard'
+          git push origin HEAD:main
