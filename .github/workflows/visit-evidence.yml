@@ -1,0 +1,60 @@
+name: Apply visit evidence
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/visit-evidence.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          test $(git hash-object app/index.js) = a34758ba7a67e70ae2a0099a03c4165d87db5973
+          test $(git hash-object app/safety-dashboard.html) = 453f47b82b0d3770caab24eebd9a9d0e052a5884
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          p=Path('app/index.js'); s=p.read_text()
+          helper=r'''function visitPhotoField(k){return /^(?:사진|(?:점검|전경|교육|개선)사진)[0-9]*$/.test(String(k).replace(/\s/g,''));}
+          function visitEvidence(rows,today=completionDayKST(new Date())){
+            const seen=new Set(), byDay=new Map(), confirmed=[], repeated=[];
+            if(new Set(rows.map(s=>JSON.stringify([s.company,s.contractDate,s.mgmtNo]))).size>1)return {confirmed,repeated};
+            for(const row of rows){
+              const keys=new Set();
+              for(const [k,p] of Object.entries(row.rawProperties||{})){
+                if(!visitPhotoField(k))continue;
+                const paths=p.type==='files'?(p.files||[]).map(f=>f.external?.url||f.file?.url):propToString(p).split(/[\n,;]+/);
+                for(const value of paths){const key=String(value||'').trim().split(/[?#]/)[0];if(key.includes('/')||key.includes('\\'))keys.add(key);}
+              }
+              const day=completionDayKST(row.lastVisit);
+              if(!day||!Number.isFinite(Date.parse(day))){for(const key of keys)seen.add(key);continue;}
+              if(day>today)continue;
+              if(!byDay.has(day))byDay.set(day,new Set());
+              for(const key of keys)byDay.get(day).add(key);
+            }
+            for(const day of [...byDay.keys()].sort()){const keys=byDay.get(day);if([...keys].some(k=>!seen.has(k)))confirmed.push(day);else if(keys.size)repeated.push(day);for(const k of keys)seen.add(k);}
+            return {confirmed,repeated};
+          }
+          '''
+          def replace(s,a,b):
+              assert s.count(a)==1,a
+              return s.replace(a,b,1)
+          s=replace(s,'function groupSites(rawSites) {',helper+'\nfunction groupSites(rawSites) {\n  const evidenceRows = new Map();')
+          s=replace(s,'    const key = s.name;','    const key = s.name;\n    if (!evidenceRows.has(key)) evidenceRows.set(key, []);\n    evidenceRows.get(key).push(s);')
+          s=replace(s,'    visits: g.visitDates.length,','    firstVisitEvidence: visitEvidence(evidenceRows.get(g.name)),\n    visits: g.visitDates.length,')
+          s=replace(s,'    if (NON_COPYABLE_TYPES.includes(prop.type)) continue;','    if (NON_COPYABLE_TYPES.includes(prop.type) || (/[방연]/.test(propertyName[0]) && visitPhotoField(key))) continue;')
+          s=s.replace("(/[방연]/.test(propertyName[0]) && visitPhotoField(key))","(['방문일자','연락요청 일자'].includes(propertyName) && visitPhotoField(key))")
+          p.write_text(s)
+          h=Path('app/safety-dashboard.html'); t=h.read_text()
+          t=replace(t,'||isLatestStatusCompleted(s))continue;','||isLatestStatusCompleted(s)||s.firstVisitEvidence?.confirmed?.length)continue;')
+          t=replace(t,"['실적 미확인 방문일',last||'—']","['실적 미확인 방문일',last?(last+(s.firstVisitEvidence?.repeated?.includes(last)?' · 이전 사진과 동일':'')):'—']")
+          subprocess.run(['node','--check',str(p)],check=True)
+          for js in re.findall(r'<script\b[^>]*>(.*?)</script>',t,re.S):subprocess.run(['node','--check'],input=js,text=True,check=True)
+          h.write_text(t)
+          PY
+          git add app/index.js app/safety-dashboard.html
+          git diff --cached --check
+          git -c user.name=github-actions -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m 'Verify first visits using distinct photo evidence'
+          git push origin HEAD:main
